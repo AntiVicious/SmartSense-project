@@ -1,0 +1,12 @@
+# --- Heavy libraries ---
+sqlalchemy
+psycopg2-binary
+pandas
+openpyxl
+requests
+Pillow
+sentence-transformers
+ultralytics
+torch
+numpy==1.23.5
+easyocr

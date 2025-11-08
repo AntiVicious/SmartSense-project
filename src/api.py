@@ -1,20 +1,23 @@
 import os
 import pandas as pd
-import io  # <-- ADD THIS LINE
 import requests
 import torch
 import json
-import numpy as np  # <-- The missing numpy import
+import numpy as np  # For data cleaning and image processing
+import io           # For reading uploaded file
+import re           # For cleaning OCR text
+import easyocr      # For OCR
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
-from contextlib import asynccontextmanager  # <-- For the lifespan fix
+from contextlib import asynccontextmanager
 from sqlalchemy import create_engine, Column, Integer, String, Float, Text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
 from ultralytics import YOLO
+from PIL import Image
 
-# --- Agent & Chat Imports (The Stable Pinned Version) ---
+# --- Agent & Chat Imports (Stable Pinned Version) ---
 from pydantic import BaseModel
 from langchain_groq import ChatGroq
 from langchain.agents import AgentExecutor
@@ -26,33 +29,21 @@ from langchain.agents.format_scratchpad.openai_tools import (
 )
 from langchain.agents.output_parsers.openai_tools import OpenAIToolsAgentOutputParser
 from langchain.chains import RetrievalQA
-from langchain_core.messages import HumanMessage, AIMessage  # <-- Correct 'AIMessage'
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_community.utilities import SQLDatabase
-from langchain_community.agent_toolkits import create_sql_agent, SQLDatabaseToolkit  # <-- Correct imports
-
-# ... (all your imports) ...
+from langchain_community.agent_toolkits import create_sql_agent, SQLDatabaseToolkit
 
 # --- 1. Environment & Config (Using Docker Service Names) ---
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_DB = os.getenv("POSTGRES_DB")
-
-# --- THIS IS THE FIX ---
-# We must connect to the Docker *service name*, not localhost
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "postgres-db") 
-# -----------------------
-
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "postgres-db") # Use service name
 DB_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}/{POSTGRES_DB}?sslmode=disable"
 
-# --- THIS IS THE FIX ---
-# We must connect to the Docker *service name*, not localhost
-QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant-db") 
-# -----------------------
-
+QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant-db") # Use service name
 QDRANT_VECTOR_COLLECTION = "properties"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# ... (rest of your file is correct) ...
 # --- 2. Database Setup (PostgreSQL) ---
 Base = declarative_base()
 engine = create_engine(DB_URL)
@@ -74,51 +65,95 @@ class Property(Base):
     bathrooms = Column(Integer)
 
 # --- 3. Database Setup (Qdrant) ---
+# We initialize clients here, but only connect/create tables in the lifespan.
 qdrant_client = QdrantClient(host=QDRANT_HOST, port=6333)
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 EMBEDDING_DIM = embedding_model.get_sentence_embedding_dimension()
-try:
-    qdrant_client.recreate_collection(
-        collection_name=QDRANT_VECTOR_COLLECTION,
-        vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.COSINE),
-    )
-except Exception as e:
-    print(f"Qdrant collection might already exist: {e}")
 
-# --- 4. Phase 1: Floorplan Model (REAL) ---
-model = None  # Lazy-load the model
-def parse_floorplan(local_image_path: str) -> dict: # <-- Takes a local path
-    global model
-    if model is None:
-        print("Lazy loading floorplan model...")
-        model = YOLO("best.pt")
+# --- 4. Phase 1: Floorplan Model (YOLO+OCR) ---
+yolo_model = None  # Lazy-load the YOLO model
+ocr_reader = None  # Lazy-load the OCR model
+
+def parse_floorplan(local_image_path: str) -> dict:
+    global yolo_model, ocr_reader
+
+    # Lazy-load YOLO model
+    if yolo_model is None:
+        print("Lazy loading floorplan model (YOLO)...")
+        yolo_model = YOLO("best.pt")  # Assumes best.pt is in /app/
     
-    # Check if file exists before predicting
+    # Lazy-load OCR model
+    if ocr_reader is None:
+        print("Lazy loading OCR model (EasyOCR)...")
+        ocr_reader = easyocr.Reader(['en'])
+        print("OCR model loaded.")
+    
     if not os.path.exists(local_image_path):
         print(f"Error: Image file not found at {local_image_path}")
         return {"error": f"Image file not found: {local_image_path}"}
     
-    results = model.predict(local_image_path, imgsz=640, conf=0.25) # <-- Predicts on path
+    print(f"Parsing image: {local_image_path}")
+    
+    try:
+        img_pil = Image.open(local_image_path).convert("RGB")
+    except Exception as e:
+        print(f"Error opening image {local_image_path}: {e}")
+        return {"error": f"Could not open image: {e}"}
+
+    # Run YOLO detection
+    results = yolo_model.predict(img_pil, imgsz=640, conf=0.25)
     result = results[0]
-    json_output = {"rooms": 0, "halls": 0, "kitchens": 0, "bathrooms": 0, "rooms_detail": []}
+
+    counts = {"rooms": 0, "halls": 0, "kitchens": 0, "bathrooms": 0}
+    room_details = []
     class_names = result.names 
-    room_details_map = {}
-    if result.masks is not None:
-        for i in range(len(result.masks)):
-            class_id = int(result.boxes.cls[i])
+    
+    if result.boxes is not None:
+        for box in result.boxes:
+            class_id = int(box.cls[0])
             label = class_names[class_id]
-            mask = result.masks.data[i].cpu().numpy()
-            area = float(np.sum(mask))  # <-- Using np.sum()
-            if label in json_output:
-                json_output[label] += 1
-            if label not in room_details_map:
-                room_details_map[label] = {"count": 0, "total_area": 0.0}
-            room_details_map[label]["count"] += 1
-            room_details_map[label]["total_area"] += area
-    for label, data in room_details_map.items():
-        json_output["rooms_detail"].append({
-            "label": label, "count": data["count"], "approx_area": data["total_area"]
-        })
+            
+            if label == 'room_name':
+                coords = box.xyxy[0].cpu().numpy().astype(int)
+                x1, y1, x2, y2 = coords
+                
+                cropped_img_pil = img_pil.crop((x1, y1, x2, y2))
+                cropped_img_np = np.array(cropped_img_pil)
+                
+                ocr_result_list = ocr_reader.readtext(cropped_img_np, detail=0)
+                
+                if ocr_result_list:
+                    detected_text = " ".join(ocr_result_list).lower()
+                    detected_text = re.sub(r'[^a-z\s]', '', detected_text).strip()
+                    print(f"  > Detected label '{label}' -> OCR Text: '{detected_text}'")
+                    
+                    # --- Simple classification based on text ---
+                    if "ki" in detected_text:
+                        counts["kitchens"] += 1
+                    elif "bath" in detected_text or "wc" in detected_text or "wash" in detected_text or "toi" in detected_text or "powder" in detected_text:
+                        counts["bathrooms"] += 1
+                    elif "hall" in detected_text or "liv" in detected_text or "great" in detected_text:
+                        counts["halls"] += 1
+                    elif "bed" in detected_text or "room" in detected_text or "br" in detected_text:
+                        # This is a general "room", e.g., bedroom
+                        counts["rooms"] += 1
+            
+            # This logic is for the 'rooms_detail' bonus
+            if label == 'room_dim':
+                coords = box.xyxy[0].cpu().numpy()
+                width = float(coords[2] - coords[0])
+                height = float(coords[3] - coords[1])
+                area = float(width * height)
+                room_details.append({"label": "room_dimension", "approx_area": area})
+
+    json_output = {
+        "rooms": counts["rooms"],
+        "halls": counts["halls"],
+        "kitchens": counts["kitchens"],
+        "bathrooms": counts["bathrooms"],
+        "rooms_detail": room_details
+    }
+    
     return json_output
 
 # -----------------------------------------------------------------
@@ -128,32 +163,38 @@ def parse_floorplan(local_image_path: str) -> dict: # <-- Takes a local path
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # This code runs ONCE, when the app starts up
-    print("FastAPI is starting up...")
+    print("FastAPI is starting up, waiting for databases...")
+    
+    # 1. Create Qdrant Collection
+    try:
+        qdrant_client.recreate_collection(
+            collection_name=QDRANT_VECTOR_COLLECTION,
+            vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.COSINE),
+        )
+        print("Qdrant collection created.")
+    except Exception as e:
+        print(f"Qdrant collection might already exist: {e}")
 
-    # 1. Create tables
+    # 2. Create PostgreSQL Tables
     try:
         Base.metadata.create_all(bind=engine)
         print("Tables created successfully.")
     except Exception as e:
         print(f"Error creating tables: {e}")
-        # In a real app, you might want to raise this
     
-    # 2. Initialize ALL database-dependent agents
+    # 3. Initialize ALL database-dependent agents
     print("Initializing agents...")
-    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, api_key=GROQ_API_KEY)
+    llm = ChatGroq(model="llama-3.1-70b-versatile", temperature=0, api_key=GROQ_API_KEY)
     
-    # --- SQL Agent ---
-    db = SQLDatabase(engine, include_tables=["properties"]) # This connection is now DELAYED    
+    db = SQLDatabase(engine, include_tables=["properties"]) # <-- This connection is now DELAYED
     sql_toolkit = SQLDatabaseToolkit(db=db, llm=llm)
     sql_agent = create_sql_agent(llm=llm, toolkit=sql_toolkit, agent_type="openai-tools", verbose=True)
-    sql_search_tool = Tool(name="structured_property_search", func=sql_agent.invoke, description="Use to query database for properties based on price, location, rooms, etc.")
+    sql_search_tool = Tool(name="structured_property_search", func=sql_agent.invoke, description="Use to query the 'properties' table for properties based on price, location, rooms, etc.")
     
-    # --- RAG Agent ---
-    vector_store = Qdrant(client=qdrant_client, collection_name=QDRANT_VECTOR_COLLECTION, embeddings=embedding_model)
+    vector_store = Qdrant(client=qdrant_client, collection_name=QDRANT_VECTOR_COLLECTION, embedding_function=embedding_model) # <-- Use embedding_function
     rag_chain = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=vector_store.as_retriever())
-    rag_search_tool = Tool(name="unstructured_property_search", func=rag_chain.invoke, description="Use to search descriptions for semantic info like 'family-friendly' or 'good view'.")
+    rag_search_tool = Tool(name="unstructured_property_search", func=rag_chain.invoke, description="Use to search property descriptions for semantic info like 'family-friendly' or 'good view'.")
     
-    # --- Mock Tools ---
     @tool
     def renovation_estimator(property_details: str) -> str:
         """Estimates renovation cost. Mock tool."""
@@ -187,15 +228,15 @@ async def lifespan(app: FastAPI):
     print("FastAPI is shutting down.")
 
 # --- 6. FastAPI App Definition ---
-app = FastAPI(title="Real Estate Search API", lifespan=lifespan)
-
-# --- THIS IS THE FIX for the 404 Error ---
-@app.get("/")
-def read_root():
-    return {"status": "ok", "message": "Backend is running!"}
-# ----------------------------------------
+app = FastAPI(title="Real-Estate API", lifespan=lifespan)
 
 # --- 7. API Endpoints ---
+
+@app.get("/")
+def read_root():
+    """Root endpoint for health checks."""
+    return {"status": "ok", "message": "Backend is running!"}
+
 class ChatRequest(BaseModel):
     query: str
     history: list[tuple[str, str]] = []
@@ -213,6 +254,7 @@ async def chat_endpoint(request: ChatRequest, fast_api_request: Request):
         chat_history.append(AIMessage(content=ai_msg))
     
     try:
+        # Run agent
         response = await agent.ainvoke({"input": request.query, "chat_history": chat_history})
         return {"status": "success", "response": response['output']}
     except Exception as e:
@@ -227,12 +269,8 @@ async def ingest_properties(file: UploadFile = File(...)):
         file_contents = await file.read()
         df = pd.read_excel(io.BytesIO(file_contents))
         
-        # --- THIS IS THE FIX ---
-        # 1. Force 'price' to be numeric. Any strings (like 'fire-safety.pdf')
-        #    will be converted to NaN (Not a Number).
+        # --- Data Cleaning ---
         df['price'] = pd.to_numeric(df['price'], errors='coerce')
-        
-        # 2. Convert all NaN values to None, which SQL can handle as NULL.
         df = df.replace({np.nan: None})
         # -----------------------
 
@@ -242,16 +280,19 @@ async def ingest_properties(file: UploadFile = File(...)):
         point_id = 1
         
         for index, row in df.iterrows():
-            # --- Get the correct, cleaned data ---
+            # --- Use .get() for safety ---
             image_filename = row.get('image_file')
             certs_link = row.get('certificates')
             long_desc = row.get('long_description')
-            price_val = row.get('price') # This is now clean (a number or None)
+            price_val = row.get('price')
             
-            # --- Build the local image path ---
-            local_image_path = os.path.join("/app/data/images", str(image_filename))
+            if not image_filename:
+                print(f"Skipping row {index}: No image filename.")
+                continue
+
+            # Construct the local path to the image
+            local_image_path = os.path.join("/app/images", str(image_filename))
             
-            # --- Parse the floorplan ---
             floorplan_data = parse_floorplan(local_image_path)
             if floorplan_data.get("error"):
                 print(f"Skipping row {index}: {floorplan_data['error']}")
@@ -261,9 +302,9 @@ async def ingest_properties(file: UploadFile = File(...)):
                 title=row.get('title'),
                 description=long_desc,
                 location=row.get('location'),
-                price=price_val, # <-- Use the cleaned price
+                price=price_val,
                 listing_date=row.get('listing_date'),
-                certifications_link=certs_link,
+                certifications_link=str(certs_link) if certs_link else None,
                 floorplan_image_url=image_filename,
                 rooms=floorplan_data.get('rooms'),
                 halls=floorplan_data.get('halls'),
@@ -290,10 +331,13 @@ async def ingest_properties(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Ingestion Error: {e}")
     finally:
         db.close()
+
 @app.post("/parse-floorplan-debug")
 async def parse_floorplan_debug(file: UploadFile = File(...)):
     file_path = f"/tmp/{file.filename}"
     with open(file_path, "wb") as f:
         f.write(await file.read())
+    
+    # We must use the local filesystem path
     data = parse_floorplan(file_path)
     return data
