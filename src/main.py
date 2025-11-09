@@ -8,7 +8,7 @@ st.set_page_config(page_title="Real Estate Search", layout="wide")
 st.title("SmartSense Real Estate Search 🏠")
 
 # --- 1. Ingestion UI ---
-st.header("Phase 2: Data Ingestion")
+st.header("Data Ingestion")
 # We now connect to localhost:8000, because FastAPI is in the same container
 BACKEND_URL = "http://localhost:8000" 
 
@@ -28,22 +28,26 @@ if st.button("Start Ingestion"):
     else:
         st.error("Please upload a file first.")
 
-# --- ADD THIS NEW SECTION (Phase 1 Debug UI) ---
+# --- 2. Phase 1 Debug UI (UPDATED) ---
 st.divider()
-st.header("Phase 1: Floorplan Image Parser")
+st.header("Floorplan Image Parser")
 uploaded_image = st.file_uploader("Upload a single floorplan image", type=["jpg", "png", "jpeg"])
+
+# --- THIS IS THE FIX ---
+# Show the image as soon as it's uploaded
+if uploaded_image is not None:
+    st.image(uploaded_image, caption="Uploaded Floorplan", use_container_width=False)
+# -----------------------
 
 if st.button("Parse Floorplan"):
     if uploaded_image is not None:
         files = {'file': (uploaded_image.name, uploaded_image.getvalue(), uploaded_image.type)}
         try:
             with st.spinner("Parsing image..."):
-                # Call the /parse-floorplan-debug endpoint
                 response = requests.post(f"{BACKEND_URL}/parse-floorplan-debug", files=files)
             
             if response.status_code == 200:
                 st.success("Image parsed successfully!")
-                # Display the raw JSON results
                 st.json(response.json())
             else:
                 st.error(f"Error from API: {response.json()['detail']}")
@@ -53,10 +57,10 @@ if st.button("Parse Floorplan"):
     else:
         st.error("Please upload an image first.")
 st.divider()
-# --- END OF NEW SECTION ---
+# --- END OF SECTION ---
 
 # --- 2. Chatbot UI ---
-st.header("Phase 3: Multi-Agent Chatbot")
+st.header("Ask me Property related questions: Multi-Agent Chatbot")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 for message in st.session_state.messages:
@@ -107,3 +111,12 @@ try:
         
 except requests.exceptions.ConnectionError:
     st.sidebar.error("Backend Connection Failed.")
+
+st.sidebar.divider()
+st.sidebar.header("Model Configuration")
+model_choice = st.sidebar.selectbox(
+    "Choose Floorplan Model",
+    ("best_300.pt", "best_1000.pt"),
+    help="Select the model to use for floorplan parsing. The 1000-epoch model may be more accurate but slower."
+)
+st.sidebar.caption(f"Using: {model_choice}")

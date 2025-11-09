@@ -7,19 +7,18 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # --- 2. Install HEAVY Python Dependencies ---
-COPY ../requirements-heavy.txt .  # <-- ADD ../
+COPY requirements-heavy.txt .  
 RUN pip install --no-cache-dir -r requirements-heavy.txt
 
 # --- 3. Install LIGHT Python Dependencies ---
-COPY ../requirements.txt .  # <-- ADD ../
+COPY requirements.txt .  
 RUN pip install --no-cache-dir -r requirements.txt
 
-# --- 4. Copy the Rest of the App ---
-COPY . .
-# This copies api.py, main.py, best.pt, run.sh from src/ to /app/
+# --- 4. Copy the App Code ---
+COPY src/ .  
 
 # --- 5. Copy the Data ---
-COPY ../data /app/data  # <-- ADD THIS LINE
+COPY data /app/data  
 
 # --- 6. FIX line endings & make executable ---
 RUN sed -i 's/\r$//' ./run.sh
