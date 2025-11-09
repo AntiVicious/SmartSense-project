@@ -80,6 +80,115 @@ real-estate-search/
 ├── docker-compose.yml        # Orchestrates all services
 ├── requirements-heavy.txt    # Large, slow-to-install Python libraries
 └── requirements.txt          # Small, fast-to-install Python libraries
+# 🏡 Real Estate Search Engine – AI/ML Case Study
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![Docker](https://img.shields.io/badge/Docker-Enabled-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
+![Streamlit](https://img.shields.io/badge/Streamlit-Frontend-red)
+![YOLOv8](https://img.shields.io/badge/YOLOv8-CV%20Model-orange)
+![LangChain](https://img.shields.io/badge/LangChain-MultiAgent-yellow)
+
+A **full-stack, AI-powered Real Estate Search Engine** built for the **Smart Sense AI/ML Case Study**.
+
+It integrates:
+- 🧠 A **custom-trained computer vision model** to parse floorplans  
+- 🧩 A **dual-database ETL pipeline** (PostgreSQL + Qdrant)  
+- 🤖 A **multi-agent chatbot** that supports natural language property queries  
+- 🐳 **Full containerization** with Docker for seamless deployment  
+
+---
+
+## 🚀 How to Run
+
+### 🧱 1. Prerequisites
+- **Docker & Docker Compose** (installed and running)
+- **Git**
+- **API Keys**
+  - [Groq](https://groq.com/) → for LLM  
+  - [Tavily](https://tavily.com/) → for web search
+
+---
+
+### ⚙️ 2. Setup Instructions
+
+#### Clone the Repository
+```bash
+git clone [Your-Repo-URL]
+cd real-estate-search
+```
+
+#### Set Up Environment File
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your API keys:
+```bash
+GROQ_API_KEY=gsk_...
+TAVILY_API_KEY=tvly_...
+
+# Default database credentials (optional to change)
+POSTGRES_USER=myuser
+POSTGRES_PASSWORD=mypassword
+POSTGRES_DB=real_estate_db
+```
+
+#### Add Project Data
+| Type | Folder | Notes |
+|------|---------|-------|
+| 🧾 Excel/CSV | `data/` | Place `Property_list.xlsx` or `.csv` |
+| 🏠 Images | `data/images/` | Floorplan images |
+| 📜 PDFs | `data/pdfs/` | Certificate PDFs (e.g., `fire-safety.pdf`) |
+| 🧠 Model | `src/` | Trained YOLO model (`best.pt`, `best_300.pt`, etc.) |
+
+#### Run the App
+```bash
+docker-compose up --build
+```
+> 🕒 First build: 30–45 mins (heavy deps)  
+> ⚡ Subsequent rebuilds: 1–2 mins only
+
+#### Access
+- **Frontend UI:** [http://localhost:8501](http://localhost:8501)  
+- **Backend Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+
+---
+
+## 📁 Project Structure
+```
+real-estate-search/
+├── src/
+│   ├── api.py               # FastAPI backend (agents, ingestion logic)
+│   ├── main.py              # Streamlit frontend (UI)
+│   ├── run.sh               # Runs FastAPI + Streamlit in one container
+│   ├── Dockerfile
+│   ├── best_300.pt          # Trained model (300 epochs)
+│   └── best_1000.pt         # Trained model (1000 epochs)
+│
+├── data/
+│   ├── Property_list.xlsx
+│   ├── images/
+│   └── pdfs/
+│
+├── .env
+├── .env.example
+├── docker-compose.yml
+├── requirements.txt
+└── requirements-heavy.txt
+```
+
+---
+
+### ✅ Summary
+This Real Estate Search Engine demonstrates:
+- 🧠 **AI-driven insights** via CV + OCR + NLP  
+- 🧩 **Hybrid data pipeline**: structured + unstructured  
+- 🤖 **LLM-powered multi-agent chatbot**  
+- 🐳 **Production-grade Docker deployment** (FastAPI + Streamlit)
+
+---
+
 Phase 1: Floorplan Computer Vision Model
 The case study required training a CV model from scratch to extract room counts.
 
@@ -155,3 +264,7 @@ Build Optimization
 The app/Dockerfile is optimized to cache the heavy, 30-minute installation (PyTorch, Ultralytics, etc.) in a separate layer using requirements-heavy.txt.
 
 Changes to the application code (api.py, main.py) or light requirements (requirements.txt) only trigger a fast, 1-2 minute rebuild.
+
+---
+
+
