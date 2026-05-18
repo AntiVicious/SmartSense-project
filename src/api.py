@@ -17,13 +17,13 @@ from qdrant_client.http.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
 from ultralytics import YOLO
 from PIL import Image
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form
 
 # --- Agent & Chat Imports (Stable Pinned Version) ---
 from pydantic import BaseModel
 from langchain_groq import ChatGroq
 from langchain.agents import AgentExecutor
 from langchain_community.vectorstores import Qdrant
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.tools import Tool, tool
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.agents.format_scratchpad.openai_tools import (
@@ -70,8 +70,13 @@ class Property(Base):
 # --- 3. Database Setup (Qdrant) ---
 # We initialize clients here, but only connect/create tables in the lifespan.
 qdrant_client = QdrantClient(host=QDRANT_HOST, port=6333)
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-EMBEDDING_DIM = embedding_model.get_sentence_embedding_dimension()
+
+# Use HuggingFaceEmbeddings (LangChain wrapper around sentence-transformers)
+# so it exposes .embed_query() / .embed_documents() that LangChain's Qdrant
+# vector store and RetrievalQA expect. A raw SentenceTransformer only has
+# .encode() and breaks RAG search.
+embedding_model = HuggingFaceEmbeddings(model_name='all-MiniLM-L6-v2')
+EMBEDDING_DIM = len(embedding_model.embed_query("dimension probe"))
 
 # --- 4. Phase 1: Floorplan Model (YOLO+OCR) ---
 model_cache = {}   # This will store our loaded models
@@ -211,15 +216,19 @@ async def lifespan(app: FastAPI):
     # This code runs ONCE, when the app starts up
     print("FastAPI is starting up, waiting for databases...")
     
-    # 1. Create Qdrant Collection
+    # 1. Create Qdrant Collection (idempotent — do NOT wipe data on restart)
     try:
-        qdrant_client.recreate_collection(
-            collection_name=QDRANT_VECTOR_COLLECTION,
-            vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.COSINE),
-        )
-        print("Qdrant collection created.")
+        existing = {c.name for c in qdrant_client.get_collections().collections}
+        if QDRANT_VECTOR_COLLECTION in existing:
+            print(f"Qdrant collection '{QDRANT_VECTOR_COLLECTION}' already exists. Reusing.")
+        else:
+            qdrant_client.create_collection(
+                collection_name=QDRANT_VECTOR_COLLECTION,
+                vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.COSINE),
+            )
+            print(f"Qdrant collection '{QDRANT_VECTOR_COLLECTION}' created.")
     except Exception as e:
-        print(f"Qdrant collection might already exist: {e}")
+        print(f"Qdrant setup failed: {e}")
 
     # 2. Create PostgreSQL Tables
     try:
@@ -237,7 +246,7 @@ async def lifespan(app: FastAPI):
     sql_agent = create_sql_agent(llm=llm, toolkit=sql_toolkit, agent_type="openai-tools", verbose=True)
     sql_search_tool = Tool(name="structured_property_search", func=sql_agent.invoke, description="Use to query the 'properties' table for properties based on price, location, rooms, etc.")
     
-    vector_store = Qdrant(client=qdrant_client, collection_name=QDRANT_VECTOR_COLLECTION, embedding_function=embedding_model) # <-- Use embedding_function
+    vector_store = Qdrant(client=qdrant_client, collection_name=QDRANT_VECTOR_COLLECTION, embeddings=embedding_model)
     rag_chain = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=vector_store.as_retriever())
     rag_search_tool = Tool(name="unstructured_property_search", func=rag_chain.invoke, description="Use to search property descriptions for semantic info like 'family-friendly' or 'good view'.")
     
@@ -247,9 +256,9 @@ async def lifespan(app: FastAPI):
         return json.dumps({"estimated_cost_lakhs": 5, "note": "This is a mock estimate"})
     
     # --- Tool 4: Web Research Agent (REAL) ---
-    # We don't need to get TAVILY_API_KEY from os.getenv()
-    # The tool will automatically find it in the environment.
-    web_search_tool = TavilySearchResults(k=3)
+    # TAVILY_API_KEY is read automatically from the environment by the tool.
+    # NOTE: the param is `max_results`, not `k` — `k=...` is silently swallowed.
+    web_search_tool = TavilySearchResults(max_results=3)
     web_search_tool.name = "web_researcher" # Give it the same name as the old tool
     web_search_tool.description = "A search engine for finding real-time information, market rates, or neighborhood details."
 
@@ -293,12 +302,20 @@ async def lifespan(app: FastAPI):
             report += f"I found {len(properties)} properties matching your criteria.\n\n---\n\n"
             
             for prop in properties:
-                report += f"### {prop.title}\n"
-                report += f"* **Location:** {prop.location}\n"
-                report += f"* **Price:** ${prop.price:,.0f}\n"
-                report += f"* **Rooms:** {prop.rooms}\n"
-                report += f"* **Bathrooms:** {prop.bathrooms}\n"
-                report += f"* **Description:** {prop.description[:150]}...\n\n"
+                price_str = f"₹{prop.price:,.0f}" if prop.price is not None else "N/A"
+                rooms_str = str(prop.rooms) if prop.rooms is not None else "N/A"
+                bath_str = str(prop.bathrooms) if prop.bathrooms is not None else "N/A"
+                if prop.description:
+                    desc_str = prop.description[:150] + ("..." if len(prop.description) > 150 else "")
+                else:
+                    desc_str = "N/A"
+
+                report += f"### {prop.title or 'Untitled property'}\n"
+                report += f"* **Location:** {prop.location or 'N/A'}\n"
+                report += f"* **Price:** {price_str}\n"
+                report += f"* **Rooms:** {rooms_str}\n"
+                report += f"* **Bathrooms:** {bath_str}\n"
+                report += f"* **Description:** {desc_str}\n\n"
             
             print(f"Generated report with {len(properties)} properties.")
             return report
@@ -400,7 +417,7 @@ async def ingest_properties(file: UploadFile = File(...), model_name: str = "bes
         print(f"Read {len(df)} rows from Excel. Cleaned price data.")
         
         qdrant_points = []
-        point_id = 1
+        ingested = 0
         
         for index, row in df.iterrows():
             # --- Use .get() for safety ---
@@ -429,14 +446,7 @@ async def ingest_properties(file: UploadFile = File(...), model_name: str = "bes
                 links = certs_link_str.split('|') # Split by pipe
                 for link in links:
                     if link and link.strip().lower().endswith('.pdf'):
-                        # Assuming links are relative, prepend a base URL
-                        # If they are full URLs, this is not needed.
-                        # For this case study, let's assume they are placeholder names
-                        # and we'd normally have a base URL.
-                        # For now, we'll just log it.
                         print(f"Found PDF link: {link.strip()}")
-                        # In a real scenario with live URLs:
-                        # report_text += fetch_and_parse_pdf(link.strip()) + " "
                         pdf_path = os.path.join("/app/data/certificates", link.strip())
                         report_text += parse_local_pdf(pdf_path) + "\n\n"
             # ---------------------------------
@@ -455,15 +465,16 @@ async def ingest_properties(file: UploadFile = File(...), model_name: str = "bes
                 bathrooms=floorplan_data.get('bathrooms')
             )
             db.add(db_property)
+            db.flush()  # populate db_property.id without committing yet
+            sql_id = db_property.id
             
             # --- UPDATED TEXT FOR EMBEDDING ---
-            # We'll add the report text (even if empty) to the context
             text_to_embed = f"Title: {title_val}. Description: {long_desc}. Location: {location_val}. Reports: {report_text}"
-            embedding = embedding_model.encode(text_to_embed).tolist()
+            embedding = embedding_model.embed_query(text_to_embed)
             
-            payload = {"text": text_to_embed, "property_id": point_id}
-            qdrant_points.append(PointStruct(id=point_id, vector=embedding, payload=payload))
-            point_id += 1
+            payload = {"text": text_to_embed, "property_id": sql_id}
+            qdrant_points.append(PointStruct(id=sql_id, vector=embedding, payload=payload))
+            ingested += 1
 
         db.commit()
         
@@ -474,7 +485,7 @@ async def ingest_properties(file: UploadFile = File(...), model_name: str = "bes
                 wait=True
             )
         
-        return {"status": "success", "message": f"Successfully ingested {point_id - 1} properties."}
+        return {"status": "success", "message": f"Successfully ingested {ingested} properties."}
     
     except KeyError as e:
         db.rollback()

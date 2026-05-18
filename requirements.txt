@@ -1,7 +1,9 @@
 # --- Light libraries ---
 fastapi
 uvicorn[standard]
-qdrant-client
+# Pin: langchain-community 0.0.34 (below) calls QdrantClient.search(),
+# which was removed in qdrant-client 1.12+. Stay on the 1.7–1.11 range.
+qdrant-client>=1.7,<1.12
 python-multipart
 streamlit
 
