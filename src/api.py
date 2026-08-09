@@ -10,6 +10,7 @@ import re           # For cleaning OCR text
 import easyocr      # For OCR
 import fitz
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from contextlib import asynccontextmanager
 from sqlalchemy import create_engine, Column, Integer, String, Float, Text
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -402,14 +403,11 @@ async def chat_endpoint(request: ChatRequest, fast_api_request: Request):
         print(f"Agent execution error: {e}")
         raise HTTPException(status_code=500, detail=f"Agent Error: {e}")
 
-@app.post("/ingest")
-async def ingest_properties(file: UploadFile = File(...), model_name: str = "best_1000.pt"):
+def _ingest_properties_sync(file_contents: bytes, model_name: str) -> dict:
     db = SessionLocal()
     try:
-        # Read the file into an in-memory bytes buffer
-        file_contents = await file.read()
         df = pd.read_excel(io.BytesIO(file_contents))
-        
+
         # --- Data Cleaning ---
         df['price'] = pd.to_numeric(df['price'], errors='coerce')
         df = df.replace({np.nan: None})
@@ -501,6 +499,14 @@ async def ingest_properties(file: UploadFile = File(...), model_name: str = "bes
     finally:
         db.close()
 
+@app.post("/ingest")
+async def ingest_properties(file: UploadFile = File(...), model_name: str = "best_1000.pt"):
+    # Read the file into an in-memory bytes buffer (async I/O), then hand the
+    # CPU-heavy parsing/ingest work (pandas, YOLO, EasyOCR, DB writes) off to a
+    # worker thread so it doesn't block the event loop for the whole request.
+    file_contents = await file.read()
+    return await run_in_threadpool(_ingest_properties_sync, file_contents, model_name)
+
 @app.post("/parse-floorplan-debug")
 async def parse_floorplan_debug(file: UploadFile = File(...), model_name: str = "best_1000.pt"):
     contents = await file.read()
@@ -511,7 +517,7 @@ async def parse_floorplan_debug(file: UploadFile = File(...), model_name: str = 
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(contents)
-        data = parse_floorplan(file_path, model_name)
+        data = await run_in_threadpool(parse_floorplan, file_path, model_name)
     finally:
         os.remove(file_path)
 
