@@ -3,7 +3,6 @@ import time
 import streamlit as st
 import requests
 
-
 # The Streamlit UI code
 st.set_page_config(page_title="Real Estate Search", layout="wide")
 st.title("SmartSense Real Estate Search 🏠")
@@ -62,9 +61,7 @@ if not st.session_state.backend_ready:
         attempt = 1
         while time.monotonic() < deadline:
             elapsed = int(BACKEND_BOOT_TIMEOUT_SEC - (deadline - time.monotonic()))
-            status_placeholder.info(
-                f"⏳ Backend is starting up… ({elapsed}s elapsed, attempt {attempt})"
-            )
+            status_placeholder.info(f"⏳ Backend is starting up… ({elapsed}s elapsed, attempt {attempt})")
             time.sleep(BACKEND_POLL_INTERVAL_SEC)
             ok, msg = _probe_backend()
             if ok:
@@ -87,12 +84,12 @@ st.header("Data Ingestion")
 uploaded_file = st.file_uploader("Upload Property Excel File", type=["xlsx", "csv"])
 if st.button("Start Ingestion"):
     if uploaded_file is not None:
-        files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+        files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
         try:
             with st.spinner("Ingesting data... This may take a moment."):
                 response = requests.post(f"{BACKEND_URL}/ingest", files=files)
             if response.status_code == 200:
-                st.success(response.json()['message'])
+                st.success(response.json()["message"])
             else:
                 st.error(f"Error: {response.json()['detail']}")
         except requests.exceptions.ConnectionError:
@@ -111,7 +108,7 @@ if uploaded_image is not None:
 
 if st.button("Parse Floorplan"):
     if uploaded_image is not None:
-        files = {'file': (uploaded_image.name, uploaded_image.getvalue(), uploaded_image.type)}
+        files = {"file": (uploaded_image.name, uploaded_image.getvalue(), uploaded_image.type)}
         try:
             with st.spinner("Parsing image..."):
                 response = requests.post(f"{BACKEND_URL}/parse-floorplan-debug", files=files)
@@ -158,11 +155,10 @@ if prompt := st.chat_input("Ask me about properties..."):
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 response = requests.post(
-                    f"{BACKEND_URL}/chat",
-                    json={"query": prompt, "history": api_history}
+                    f"{BACKEND_URL}/chat", json={"query": prompt, "history": api_history}
                 )
             if response.status_code == 200:
-                ai_response = response.json()['response']
+                ai_response = response.json()["response"]
                 st.markdown(ai_response)
                 st.session_state.messages.append({"role": "assistant", "content": ai_response})
             else:

@@ -69,6 +69,7 @@ def _make_excel_bytes(rows: list) -> bytes:
 def _fake_parse_floorplan_fixed(result):
     def _parser(path):
         return dict(result)
+
     return _parser
 
 
@@ -77,6 +78,7 @@ def _fake_parse_floorplan_error_for(bad_filenames, ok_result):
         if any(bad in path for bad in bad_filenames):
             return {"error": f"no floorplan model output for {path}"}
         return dict(ok_result)
+
     return _parser
 
 
@@ -88,15 +90,17 @@ def test_ingest_maps_row_fields_and_upserts_one_point():
     qdrant_client = FakeQdrantClient()
     embedder = FakeEmbedder()
 
-    rows = [{
-        "title": "Cozy Cottage",
-        "location": "Springfield",
-        "price": 250000,
-        "listing_date": "listed-2024",
-        "certificates": "fire-safety.pdf",
-        "image_file": "house1.jpg",
-        "long_description": "A lovely home.",
-    }]
+    rows = [
+        {
+            "title": "Cozy Cottage",
+            "location": "Springfield",
+            "price": 250000,
+            "listing_date": "listed-2024",
+            "certificates": "fire-safety.pdf",
+            "image_file": "house1.jpg",
+            "long_description": "A lovely home.",
+        }
+    ]
 
     result = ingest_properties_sync(
         _make_excel_bytes(rows),
@@ -150,8 +154,22 @@ def test_ingest_skips_row_with_blank_image_file():
     session_factory = _make_session_factory()
 
     rows = [
-        {"title": "No Image", "location": "X", "price": 100, "image_file": "", "certificates": "", "long_description": ""},
-        {"title": "Has Image", "location": "Y", "price": 200, "image_file": "house2.jpg", "certificates": "", "long_description": ""},
+        {
+            "title": "No Image",
+            "location": "X",
+            "price": 100,
+            "image_file": "",
+            "certificates": "",
+            "long_description": "",
+        },
+        {
+            "title": "Has Image",
+            "location": "Y",
+            "price": 200,
+            "image_file": "house2.jpg",
+            "certificates": "",
+            "long_description": "",
+        },
     ]
 
     result = ingest_properties_sync(
@@ -177,8 +195,22 @@ def test_ingest_skips_row_when_parser_reports_error():
     session_factory = _make_session_factory()
 
     rows = [
-        {"title": "Bad Floorplan", "location": "X", "price": 100, "image_file": "missing.jpg", "certificates": "", "long_description": ""},
-        {"title": "Good Floorplan", "location": "Y", "price": 200, "image_file": "house2.jpg", "certificates": "", "long_description": ""},
+        {
+            "title": "Bad Floorplan",
+            "location": "X",
+            "price": 100,
+            "image_file": "missing.jpg",
+            "certificates": "",
+            "long_description": "",
+        },
+        {
+            "title": "Good Floorplan",
+            "location": "Y",
+            "price": 200,
+            "image_file": "house2.jpg",
+            "certificates": "",
+            "long_description": "",
+        },
     ]
 
     result = ingest_properties_sync(
@@ -203,7 +235,16 @@ def test_ingest_skips_row_when_parser_reports_error():
 def test_ingest_cleans_non_numeric_price_to_none():
     session_factory = _make_session_factory()
 
-    rows = [{"title": "Weird Price", "location": "X", "price": "N/A", "image_file": "house.jpg", "certificates": "", "long_description": ""}]
+    rows = [
+        {
+            "title": "Weird Price",
+            "location": "X",
+            "price": "N/A",
+            "image_file": "house.jpg",
+            "certificates": "",
+            "long_description": "",
+        }
+    ]
 
     ingest_properties_sync(
         _make_excel_bytes(rows),

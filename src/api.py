@@ -88,17 +88,22 @@ app = FastAPI(title="Real-Estate API", lifespan=lifespan)
 def get_app_settings(request: Request) -> Settings:
     return request.app.state.settings
 
+
 def get_app_engine(request: Request):
     return request.app.state.engine
+
 
 def get_app_qdrant_client(request: Request):
     return request.app.state.qdrant_client
 
+
 def get_app_embedder(request: Request):
     return request.app.state.embedder
 
+
 def get_app_session_factory(request: Request):
     return request.app.state.session_factory
+
 
 def get_app_agent_executor(request: Request):
     return request.app.state.agent_executor
@@ -106,10 +111,12 @@ def get_app_agent_executor(request: Request):
 
 # --- API Endpoints ---
 
+
 @app.get("/")
 def read_root():
     """Root endpoint for health checks."""
     return {"status": "ok", "message": "Backend is running!"}
+
 
 @app.get("/health")
 def health_check(
@@ -147,6 +154,7 @@ def health_check(
         content={"status": "ok" if healthy else "unhealthy", "checks": checks},
     )
 
+
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest, agent_executor=Depends(get_app_agent_executor)):
     if not agent_executor:
@@ -160,10 +168,11 @@ async def chat_endpoint(request: ChatRequest, agent_executor=Depends(get_app_age
     try:
         # Run agent
         response = await agent_executor.ainvoke({"input": request.query, "chat_history": chat_history})
-        return {"status": "success", "response": response['output']}
+        return {"status": "success", "response": response["output"]}
     except Exception as e:
         print(f"Agent execution error: {e}")
         raise HTTPException(status_code=500, detail=f"Agent Error: {e}")
+
 
 @app.post("/ingest")
 async def ingest_properties(
@@ -185,6 +194,7 @@ async def ingest_properties(
         embedder=embedder,
         qdrant_collection=settings.QDRANT_VECTOR_COLLECTION,
     )
+
 
 @app.post("/parse-floorplan-debug")
 async def parse_floorplan_debug(file: UploadFile = File(...)):

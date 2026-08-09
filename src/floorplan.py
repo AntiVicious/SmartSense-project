@@ -39,7 +39,13 @@ def classify_room_label(detected_text: str) -> str:
     """
     if "ki" in detected_text:
         return "kitchens"
-    elif "bath" in detected_text or "wc" in detected_text or "wash" in detected_text or "toi" in detected_text or "powder" in detected_text:
+    elif (
+        "bath" in detected_text
+        or "wc" in detected_text
+        or "wash" in detected_text
+        or "toi" in detected_text
+        or "powder" in detected_text
+    ):
         return "bathrooms"
     elif "hall" in detected_text or "liv" in detected_text or "great" in detected_text:
         return "halls"
@@ -66,7 +72,7 @@ def parse_floorplan(local_image_path: str) -> dict:
     # Lazy-load OCR model
     if _ocr_reader is None:
         print("Lazy loading OCR model (EasyOCR)...")
-        _ocr_reader = easyocr.Reader(['en'])
+        _ocr_reader = easyocr.Reader(["en"])
         print("OCR model loaded.")
 
     if not os.path.exists(local_image_path):
@@ -85,8 +91,7 @@ def parse_floorplan(local_image_path: str) -> dict:
     results = model.predict(img_pil, imgsz=640, conf=0.25)
     result = results[0]
 
-    counts = {"rooms": 0, "halls": 0, "kitchens": 0, "bathrooms": 0, "others" : 0}
-    room_details = []
+    counts = {"rooms": 0, "halls": 0, "kitchens": 0, "bathrooms": 0, "others": 0}
     class_names = result.names
 
     if result.boxes is not None:
@@ -94,7 +99,7 @@ def parse_floorplan(local_image_path: str) -> dict:
             class_id = int(box.cls[0])
             label = class_names[class_id]
 
-            if label == 'room_name':
+            if label == "room_name":
                 coords = box.xyxy[0].cpu().numpy().astype(int)
                 x1, y1, x2, y2 = coords
 
@@ -105,18 +110,17 @@ def parse_floorplan(local_image_path: str) -> dict:
 
                 if ocr_result_list:
                     detected_text = " ".join(ocr_result_list).lower()
-                    detected_text = re.sub(r'[^a-z\s]', '', detected_text).strip()
+                    detected_text = re.sub(r"[^a-z\s]", "", detected_text).strip()
                     print(f"  > Detected label '{label}' -> OCR Text: '{detected_text}'")
 
                     counts[classify_room_label(detected_text)] += 1
-
 
     json_output = {
         "rooms": counts["rooms"],
         "halls": counts["halls"],
         "kitchens": counts["kitchens"],
         "bathrooms": counts["bathrooms"],
-        "other rooms": counts["others"]
+        "other rooms": counts["others"],
     }
 
     return json_output

@@ -35,20 +35,36 @@ Do not answer general knowledge questions, write code, or discuss other topics.
 """
 
 
-def build_agent_executor(*, engine, qdrant_client, embedder, session_factory, settings: Settings) -> AgentExecutor:
+def build_agent_executor(
+    *, engine, qdrant_client, embedder, session_factory, settings: Settings
+) -> AgentExecutor:
     llm = ChatGroq(model=settings.LLM_MODEL_NAME, temperature=0, api_key=settings.GROQ_API_KEY)
 
     db = SQLDatabase(engine, include_tables=["properties"])
     sql_toolkit = SQLDatabaseToolkit(db=db, llm=llm)
     sql_agent = create_sql_agent(llm=llm, toolkit=sql_toolkit, agent_type="openai-tools", verbose=True)
-    sql_search_tool = Tool(name="structured_property_search", func=sql_agent.invoke, description="Use to query the 'properties' table for properties based on price, location, rooms, etc.")
+    sql_search_tool = Tool(
+        name="structured_property_search",
+        func=sql_agent.invoke,
+        description="Use to query the 'properties' table for properties based on price, location, rooms, etc.",
+    )
 
-    vector_store = Qdrant(client=qdrant_client, collection_name=settings.QDRANT_VECTOR_COLLECTION, embeddings=embedder)
-    rag_chain = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=vector_store.as_retriever())
-    rag_search_tool = Tool(name="unstructured_property_search", func=rag_chain.invoke, description="Use to search property descriptions for semantic info like 'family-friendly' or 'good view'.")
+    vector_store = Qdrant(
+        client=qdrant_client, collection_name=settings.QDRANT_VECTOR_COLLECTION, embeddings=embedder
+    )
+    rag_chain = RetrievalQA.from_chain_type(
+        llm=llm, chain_type="stuff", retriever=vector_store.as_retriever()
+    )
+    rag_search_tool = Tool(
+        name="unstructured_property_search",
+        func=rag_chain.invoke,
+        description="Use to search property descriptions for semantic info like 'family-friendly' or 'good view'.",
+    )
 
     @tool
-    def generate_property_report(location: str = None, min_price: float = None, max_price: float = None, min_rooms: int = None) -> str:
+    def generate_property_report(
+        location: str = None, min_price: float = None, max_price: float = None, min_rooms: int = None
+    ) -> str:
         """
         Generates a summary report of properties matching search criteria.
         Use this when the user asks for a 'report', 'summary', or 'list' of properties.
@@ -58,7 +74,7 @@ def build_agent_executor(*, engine, qdrant_client, embedder, session_factory, se
             max_price (float): The maximum price.
             min_rooms (int): The minimum number of rooms.
         """
-        print(f"--- Report Generation Agent Triggered ---")
+        print("--- Report Generation Agent Triggered ---")
         db = session_factory()
         try:
             # Build the query dynamically based on provided arguments
@@ -83,7 +99,7 @@ def build_agent_executor(*, engine, qdrant_client, embedder, session_factory, se
                 return "I found no properties matching those criteria."
 
             # --- Create a Markdown report string ---
-            report = f"# Property Report\n\n"
+            report = "# Property Report\n\n"
             report += f"I found {len(properties)} properties matching your criteria.\n\n---\n\n"
 
             for prop in properties:
@@ -114,16 +130,24 @@ def build_agent_executor(*, engine, qdrant_client, embedder, session_factory, se
     # --- Assemble Agent ---
     tools = [sql_search_tool, rag_search_tool, generate_property_report]
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT),
-        MessagesPlaceholder(variable_name="chat_history"),
-        ("user", "{input}"),
-        MessagesPlaceholder(variable_name="agent_scratchpad"),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", SYSTEM_PROMPT),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
     llm_with_tools = llm.bind_tools(tools)
     main_agent = (
-        {"input": lambda x: x["input"], "agent_scratchpad": lambda x: format_to_openai_tool_messages(x["intermediate_steps"]), "chat_history": lambda x: x["chat_history"],}
-        | prompt | llm_with_tools | OpenAIToolsAgentOutputParser()
+        {
+            "input": lambda x: x["input"],
+            "agent_scratchpad": lambda x: format_to_openai_tool_messages(x["intermediate_steps"]),
+            "chat_history": lambda x: x["chat_history"],
+        }
+        | prompt
+        | llm_with_tools
+        | OpenAIToolsAgentOutputParser()
     )
 
     return AgentExecutor(agent=main_agent, tools=tools, verbose=True)

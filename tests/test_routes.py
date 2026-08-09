@@ -140,7 +140,10 @@ def test_health_all_dependencies_healthy():
         with TestClient(app) as client:
             resp = client.get("/health")
         assert resp.status_code == 200
-        assert resp.json() == {"status": "ok", "checks": {"postgres": True, "qdrant": True, "agent_executor": True}}
+        assert resp.json() == {
+            "status": "ok",
+            "checks": {"postgres": True, "qdrant": True, "agent_executor": True},
+        }
     finally:
         app.dependency_overrides.clear()
 
@@ -257,7 +260,13 @@ def test_ingest_route_wires_dependency_overrides():
         with TestClient(app) as client:
             resp = client.post(
                 "/ingest",
-                files={"file": ("props.xlsx", excel_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+                files={
+                    "file": (
+                        "props.xlsx",
+                        excel_bytes,
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
+                },
             )
         assert resp.status_code == 200
         assert resp.json() == {"status": "success", "message": "Successfully ingested 0 properties."}

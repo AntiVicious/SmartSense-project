@@ -20,8 +20,8 @@ if _REPO_ROOT not in sys.path:
 
 from src.floorplan import classify_room_label  # noqa: E402
 
-
 # --- Kitchens: "ki" substring ---
+
 
 def test_kitchen_matches():
     assert classify_room_label("kitchen") == "kitchens"
@@ -40,6 +40,7 @@ def test_kitchen_branch_wins_even_with_bath_also_present():
 
 
 # --- Bathrooms: "bath" / "wc" / "wash" / "toi" / "powder" ---
+
 
 def test_bathroom_bath_keyword():
     assert classify_room_label("bath") == "bathrooms"
@@ -73,6 +74,7 @@ def test_bathroom_wins_over_room_due_to_branch_order():
 
 # --- Halls: "hall" / "liv" / "great" ---
 
+
 def test_hall_keyword():
     assert classify_room_label("hallway") == "halls"
 
@@ -99,6 +101,7 @@ def test_hall_entrance_hall():
 
 
 # --- Rooms (bedrooms): "bed" / "room" / "br" ---
+
 
 def test_bedroom_bed_keyword():
     assert classify_room_label("bedroom") == "rooms"
@@ -127,6 +130,7 @@ def test_br_false_positive_breakfast():
 
 
 # --- Others: no keyword matches ---
+
 
 def test_others_fallback_for_unrelated_labels():
     for label in ("storage", "office", "den", "garage", "closet", "pantry", "entry", "terrace", "veranda"):
