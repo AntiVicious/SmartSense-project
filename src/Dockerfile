@@ -15,14 +15,18 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # --- 4. Copy the App Code ---
-COPY src/ .  
+# Preserved as a package (src/api.py, src/config.py, ...) rather than
+# flattened into /app — api.py uses relative imports (from .config import
+# ...), which only resolve if src stays a real package both here and in
+# local dev, where `python -c "import src.api"` is run from the repo root.
+COPY src/ ./src/
 
 # --- 5. Copy the Data ---
-COPY data /app/data  
+COPY data /app/data
 
 # --- 6. FIX line endings & make executable ---
-RUN sed -i 's/\r$//' ./run.sh
-RUN chmod +x ./run.sh
+RUN sed -i 's/\r$//' ./src/run.sh
+RUN chmod +x ./src/run.sh
 
 # --- 7. Run the App ---
-CMD ["./run.sh"]
+CMD ["./src/run.sh"]
