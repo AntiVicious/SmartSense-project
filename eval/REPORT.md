@@ -2,100 +2,224 @@
 
 Measures `classify_room_label()` in `src/floorplan.py` — the substring
 cascade that buckets each OCR'd floorplan label into `kitchens` /
-`bathrooms` / `halls` / `rooms` / `others` — against real detections on a
-held-out split of `data/images/`. Baseline measurement below is followed
-by an implemented fix (`prepare_ocr_crop`) and a re-measurement, per the
-baseline's own recommendation.
+`bathrooms` / `halls` / `rooms` / `others` — against real detections.
+Baseline measurement, an implemented fix (`prepare_ocr_crop`), and a
+re-measurement.
+
+> **Correction (this revision).** Two figures in an earlier version of
+> this report didn't hold up to review and are fixed here:
+> 1. Accuracy was originally reported on a 15-image held-out subset
+>    (N=272 boxes). At that N, each image is worth ~6.7 accuracy points —
+>    the reported 0.74→0.78 delta is under one image's worth of signal
+>    and isn't distinguishable from noise. Re-run over **all 73 images**
+>    (N=1190 scored boxes) below, with a proper paired significance test,
+>    not just a before/after point estimate.
+> 2. The empty-OCR-rate before/after — measured over crops, not images,
+>    so it has ~4.5x more units behind it even at the old N — is promoted
+>    to the primary result. It doesn't need ground-truth labeling at all
+>    (it's just "did OCR return text or not"), so it's the cheapest number
+>    here to trust.
+>
+> The 15-image subset is kept below, explicitly labeled as the original
+> holdout, for transparency about what changed.
 
 ## Reproduce
 
 ```bash
-# 1. Run the real YOLO + EasyOCR pipeline over the held-out split, write a
-#    labeling worksheet (needs the api image: torch/ultralytics/easyocr)
+# Full 73-image set, current (after-fix) pipeline
 docker run --rm \
-  -v "$(pwd)/scripts:/app/scripts:ro" -v "$(pwd)/eval:/app/eval" -w /app \
+  -v "$(pwd)/scripts:/app/scripts:ro" -v "$(pwd)/eval/full73:/app/eval" -w /app \
   smartsense-project-api:latest python scripts/eval_floorplan_classifier.py extract \
-    --images-dir /app/data/images --out /app/eval --eval-fraction 0.2 --seed 42
+    --images-dir /app/data/images --out /app/eval --eval-fraction 1.0 --seed 42
+# -> eval/full73/after_detections.csv (ground truth already filled in, see Methodology)
 
-# 2. Hand-label eval/detections.csv's ground_truth_class column (already
-#    done -- see Methodology below -- this step is committed, not rerun)
+# Full 73-image set, pre-fix pipeline (for the before/after comparison) --
+# retrieves the code as it was immediately before the OCR-crop-padding fix
+# (commit ddc16fc) and runs the same extraction with it:
+git show a2289ad:src/floorplan.py > /tmp/floorplan_prefix.py
+git show a2289ad:scripts/eval_floorplan_classifier.py > /tmp/eval_prefix.py
+docker run --rm \
+  -v "/tmp/eval_prefix.py:/app/scripts/eval_floorplan_classifier.py:ro" \
+  -v "/tmp/floorplan_prefix.py:/app/src/floorplan.py:ro" \
+  -v "$(pwd)/eval/full73_before:/app/eval" -w /app \
+  smartsense-project-api:latest python scripts/eval_floorplan_classifier.py extract \
+    --images-dir /app/data/images --out /app/eval --eval-fraction 1.0 --seed 42
+# -> join ground truth from after_detections.csv by (image, box_index); see
+#    eval/full73/before_detections.csv for the already-joined result.
 
-# 3. Score
+# Score either one
 python scripts/eval_floorplan_classifier.py score \
-  --detections eval/detections.csv --out eval/REPORT.md
+  --detections eval/full73/after_detections.csv --out /dev/stdout
 ```
 
 ## Methodology
 
-**What was held out, from what.** `data/images/` has 73 labeled floorplan
-images. A fixed-seed (42) shuffle splits them into 15 **eval** images
-(20%) and 58 **dev** images (80%) — see `eval/split.json` for the exact
-list. Every number below comes only from the 15 eval images; the 58 dev
-images were never looked at while producing these numbers and are
-reserved for future rule iteration if Tier 4 proceeds past measurement.
-
-`classify_room_label()` itself is fixed hand-written rules, not something
-trained on this data, so there's no train/test leakage risk in the usual
-ML sense. The split still matters for two reasons: it stops this report
-from being tuned (consciously or not) against the same examples it's
-graded on, and it's the only honest way to state a sample size.
-
-**Limitation, stated plainly:** the YOLO detector *was* trained on a
-subset of this image pool (`notebooks/train.ipynb`, 80/20 split,
-`random_state=42`), but its original COCO annotation file lived outside
-this repo (Google Drive) and isn't recoverable from what's checked in —
-so it's not possible to guarantee these 15 eval images were unseen by the
-detector during *its* training. If any were in YOLO's training fold,
-detection recall (how much text reaches the classifier at all) may be
-mildly optimistic here relative to genuinely novel floorplans. This
-doesn't affect the *classifier's* precision/recall given a detected box —
-only how representative the box population itself is.
+**Why the full 73 images, not a held-out split, for the headline number.**
+`classify_room_label()` is fixed hand-written rules, not something trained
+on this data — there's no leakage risk in scoring it on every image, which
+is exactly the reasoning that motivated re-running this at N=73 instead of
+N=15. The 15-image subset (`eval/split.json`) is kept as a separate,
+labeled result below for continuity with the original measurement, not
+because it's methodologically necessary anymore.
 
 **What's actually measured.** The real pipeline, not a synthetic
 approximation: the same `best_1000.pt` YOLO model at `imgsz=640,
 conf=0.25`, the same EasyOCR call, the same regex cleaning
-(`src/floorplan.py`'s `parse_floorplan`), feeding the real (and
-sometimes wrong) `detected_text` into the actual, unmodified
-`classify_room_label()`. OCR noise is part of what's being measured, not
-abstracted away — that's deliberate, since it's what the deployed system
-actually sees.
+(`src/floorplan.py`'s `parse_floorplan`), feeding the real (and sometimes
+wrong) `detected_text` into the actual, unmodified `classify_room_label()`.
 
-**Ground truth.** Every detected `room_name` box in the eval split was
-hand-labeled by viewing its cropped image (`eval/crops/`, batched into
-upscaled contact sheets for review) against the same 5-bucket taxonomy
-the app uses. Two judgment calls, stated explicitly so they can be
-second-guessed:
+**Ground truth, N=1220 detected boxes across 73 images.** Built in two
+passes:
+- The original 15-image subset's 282 hand-labeled boxes (already
+  reviewed, one correction already applied — see the original report's
+  note, preserved in git history) carried forward by `(image,
+  box_index)` join — not relabeled.
+- The remaining 58 images' 938 boxes labeled fresh: 696 resolved directly
+  from OCR text via a documented text→category mapping
+  (`cleaned_text` values like `"kitchen"`, `"kichen"`, `"bedroom"` are
+  unambiguous even garbled) built by reading all 630 unique OCR strings
+  in this run; the remaining 242 (every empty-text box plus every
+  genuinely ambiguous or garbled non-empty one — nothing was assumed)
+  reviewed visually via upscaled contact sheets, same method as the
+  original 15-image pass.
 
-- `rooms` = bedrooms specifically, matching `classify_room_label`'s own
-  docstring ("e.g., bedroom") — "bonus room" and "guest suite" count,
-  "mud room" and "dining room" don't.
-- `halls` = living room / great room / hallway, matching the rule's own
-  target keywords (`hall`/`liv`/`great`). Foyers and entries are *not*
-  counted as halls even though they're entry-adjacent spaces — the rule
-  doesn't target them, so grading them as halls would be scoring the
-  classifier against a taxonomy it was never written to hit.
+Same taxonomy as before: `rooms` = bedrooms specifically; `halls` =
+living room / great room / hallway (not foyer, not family room — matching
+the substring rule's own target keywords, not a broader "similar space"
+reading); everything else is `others`. 30 of 1220 boxes (2.5%) were too
+degraded to confidently label even by eye — excluded from scoring, listed
+in `eval/full73/excluded_unreadable.csv`.
 
-Everything else (garage, patio, porch, closet, storage, utility,
-dining, study/office, deck, mudroom, laundry) is `others`.
+Box detection is deterministic (same model, same params, no randomness in
+inference) — verified directly, not assumed: the after-fix run was
+executed twice independently this session and produced byte-identical
+predictions on all 272 shared boxes; the before-fix and after-fix runs
+produced the same 1220 total boxes in the same order, which is what makes
+carrying one ground-truth labeling pass across both valid.
 
-10 of 282 detected boxes (3.5%) were too degraded to confidently label
-even by eye at 5x upscale — excluded from scoring rather than guessed at.
-See `eval/detections_excluded_unreadable.csv`.
+## Primary result: empty-OCR-rate, N = 1220 boxes across all 73 images
 
-**Sample size: N = 272** labeled detections across the 15 held-out
-images.
+| | before `prepare_ocr_crop` | after | change |
+|---|---|---|---|
+| Empty OCR text | 410 / 1220 (33.6%) | 131 / 1220 (10.7%) | 68% relative reduction |
 
-**Correction found during the re-verification pass below:** one box
-(`19_17_...`, box 2, "GREAT ROOM") was mislabeled `others` in the
-original pass — a transcription slip while reading a 30-crop contact
-sheet, not a genuine ambiguity. Caught while re-checking a handful of
-crops after implementing the fix below, and corrected in both the
-baseline and post-fix datasets before any of the numbers in this report
-were computed. Flagging it rather than quietly fixing it, since "trust
-but verify your own labels too" is the same discipline this whole
-exercise is built on.
+This needs no ground-truth labeling — it's a direct count of whether
+EasyOCR returned any text at all — so it's the number to trust most in
+this report. It's also the mechanism behind every other number below:
+`classify_room_label("")` always resolves to `others`, so this is the
+single biggest lever on the classifier's apparent accuracy, independent
+of the substring rules' own correctness.
 
-## Baseline confusion matrix (rows = ground truth, columns = predicted)
+## Secondary, directional: accuracy, with sample size and a real significance test
+
+Point accuracy alone is a weak signal at any N here (`others` is 61% of
+the sample by ground truth) — reported with a **paired** test (same 1190
+boxes scored under both pipeline versions; a box flips from wrong→right,
+right→wrong, or stays put) rather than treating before/after as
+independent samples, since that's what they actually are.
+
+| Split | N (scored boxes) | Accuracy before | Accuracy after | Improved / regressed (of N) | Paired sign-test p-value |
+|---|---|---|---|---|---|
+| **Full set (headline)** | **1190** | **943/1190 = 0.79** | **969/1190 = 0.81** | 50 improved, 24 regressed (net +26) | **p = 0.0034** |
+| 15-image subset (original holdout) | 272 | 203/272 = 0.75 | 211/272 = 0.78 | 14 improved, 6 regressed (net +8) | p = 0.115 |
+
+Reading this straight: at the original N=272, the improvement is **not**
+distinguishable from noise (p=0.115) — confirming the original concern
+exactly. At the full N=1190, the same kind of test on the same kind of
+paired data **is** significant (p=0.0034). The full-set delta (+2
+points) is smaller than the 15-image subset's (+3 points) — the original
+subset's larger-looking delta was itself partly noise, in the direction
+you'd worry about (overstating the effect), not just imprecise.
+
+(15-image subset's before-accuracy here, 203/272, differs from this
+subset by one box from the number in the original report, 202/272 —
+tracked down to the pre-fix run specifically, not the after-fix run
+(which reproduced byte-identical on both independent runs); not chased
+further since it doesn't change either number's conclusion or the
+paired-test result, which uses this run's own numbers on both sides
+consistently.)
+
+## Confusion matrices and per-class precision/recall, full set (N=1190)
+
+### Before (pre-`prepare_ocr_crop`)
+
+| true \ pred | kitchens | bathrooms | halls | rooms | others | support |
+|---|---|---|---|---|---|---|
+| **kitchens** | 62 | 0 | 0 | 0 | 26 | 88 |
+| **bathrooms** | 0 | 33 | 0 | 1 | 105 | 139 |
+| **halls** | 0 | 0 | 53 | 5 | 34 | 92 |
+| **rooms** | 0 | 0 | 0 | 90 | 55 | 145 |
+| **others** | 0 | 0 | 0 | 21 | 705 | 726 |
+
+| class | precision | recall | support (true) | predicted count |
+|---|---|---|---|---|
+| kitchens | 1.00 | 0.70 | 88 | 62 |
+| bathrooms | 1.00 | 0.24 | 139 | 33 |
+| halls | 1.00 | 0.58 | 92 | 53 |
+| rooms | 0.77 | 0.62 | 145 | 117 |
+| others | 0.76 | 0.97 | 726 | 925 |
+
+### After (with `prepare_ocr_crop`)
+
+| true \ pred | kitchens | bathrooms | halls | rooms | others | support |
+|---|---|---|---|---|---|---|
+| **kitchens** | 71 | 0 | 0 | 0 | 17 | 88 |
+| **bathrooms** | 0 | 49 | 0 | 1 | 89 | 139 |
+| **halls** | 0 | 0 | 51 | 8 | 33 | 92 |
+| **rooms** | 0 | 0 | 0 | 98 | 47 | 145 |
+| **others** | 1 | 1 | 0 | 24 | 700 | 726 |
+
+| class | precision | recall | support (true) | predicted count |
+|---|---|---|---|---|
+| kitchens | 0.99 | 0.81 | 88 | 72 |
+| bathrooms | 0.98 | 0.35 | 139 | 50 |
+| halls | 1.00 | 0.55 | 92 | 51 |
+| rooms | 0.75 | 0.68 | 145 | 131 |
+| others | 0.79 | 0.96 | 726 | 886 |
+
+## Investigation: what the larger sample changes about the original findings
+
+**The "1.00 precision" caveat from the 15-image report was correct to
+flag, and now confirmed directly.** At N=1190, kitchens precision drops
+to 0.99 and bathrooms to 0.98 — both from new false positives that
+simply weren't present in the smaller sample:
+
+- `"nooki"` (true: a nook, `others`) contains the literal substring
+  `"ki"` → misclassified `kitchens`. This is the exact `"ki"`/parking-
+  shaped bug the original report predicted would surface with more data
+  — same failure mode, different trigger word.
+- `"pdr room"` (true: a powder room, `bathrooms`) → misclassified
+  `rooms`. A previously undocumented gap: `classify_room_label` only
+  recognizes the literal substring `"powder"` for bathrooms, not the
+  common abbreviation `"pdr"` — so `"pdr room"` skips the bathroom branch
+  entirely and falls through to the generic `"room"` match instead.
+- `"covliiog toica"` (true: covered porch, `others`) → misclassified
+  `bathrooms` via `"toi"`. Same case already identified in the 15-image
+  report; still present, not new.
+
+**Where the fix helped and didn't hold up at the larger N.** Kitchens and
+rooms recall both improved substantially (0.70→0.81, 0.62→0.68); halls
+recall actually *dropped slightly* (0.58→0.55) rather than staying flat
+as the 15-image report found — consistent with that report's own
+explanation (`"hall"`/`"liv"`/`"great"` are longer, pickier substrings
+that residual OCR noise keeps landing on) rather than contradicting it,
+just a more precise measurement of the same effect.
+
+**Precision costs are also confirmed at scale.** Bathrooms precision
+1.00→0.98 and rooms precision 0.77→0.75 both dropped for the same reason
+identified in the 15-image report: more legible text now reaches
+`classify_room_label` instead of failing silently into `others`, which
+also means more chances for the substring-logic bugs (documented and
+newly found above) to fire.
+
+## Original 15-image subset (untouched holdout, no longer the headline)
+
+Kept for transparency about what the original report claimed and how it
+compares. Ground truth, split, and crops unchanged from the original
+measurement (`eval/split.json`, `eval/detections.csv`,
+`eval/detections_excluded_unreadable.csv`, `eval/crops/`).
+
+### Before
 
 | true \ pred | kitchens | bathrooms | halls | rooms | others | support |
 |---|---|---|---|---|---|---|
@@ -105,85 +229,9 @@ exercise is built on.
 | **rooms** | 0 | 0 | 0 | 14 | 22 | 36 |
 | **others** | 0 | 0 | 0 | 1 | 170 | 171 |
 
-## Baseline per-class precision / recall
+Accuracy: 202/272 = 0.74 (N=272).
 
-| class | precision | recall | support (true) | predicted count |
-|---|---|---|---|---|
-| kitchens | 1.00 | 0.41 | 17 | 7 |
-| bathrooms | 1.00 | 0.22 | 32 | 7 |
-| halls | 1.00 | 0.25 | 16 | 4 |
-| rooms | 0.93 | 0.39 | 36 | 15 |
-| others | 0.71 | 0.99 | 171 | 239 |
-
-Baseline accuracy: 202/272 = 0.74 (dominated by `others`, 63% of the
-sample by ground truth — not a meaningful headline number on its own,
-which is exactly why per-class numbers were asked for).
-
-## Investigation 1: the 1.00 precisions are not evidence the rules are fine
-
-Perfect precision on 3 of 4 real classes looks too good given Tier 4's
-own bug list (`"ki"` matches *parking*, `"br"` matches *library* and
-*breakfast*). It is too good, for a specific, checkable reason: **none of
-those trigger words appear anywhere in this 15-image sample.** These
-floorplans label vehicle storage "GARAGE" or "CARPORT", never "PARKING",
-and none of them have a library, study-as-library, or breakfast nook
-labeled that way. A different 15-image sample, or the 58 dev images, would
-very plausibly surface both bugs and pull kitchen/room precision below
-1.00. Treat the 1.00s as "not contradicted by this sample," not as "the
-documented bugs don't matter."
-
-## Investigation 2: where the baseline errors come from
-
-70 of the 101 true kitchen/bathroom/hall/room instances were
-misclassified at baseline. All but one trace back to the OCR step, not to
-`classify_room_label`'s branch logic:
-
-- **41 had completely empty OCR text.** `classify_room_label("")` always
-  falls through to `others` by construction — there's no substring for it
-  to possibly match, so these were never in the classifier's control at
-  all.
-- **28 had non-empty but corrupted OCR text** where the corruption
-  specifically destroyed the trigger substring — e.g. `"kitchen"` read
-  back as `"ktchey"` (the `i` is gone, so `"ki"` no longer appears), or
-  `"bath"` read back as `"batn"` / `"tond"` / `"da"`. A human reading the
-  crop can tell these say KITCHEN and BATH; the substring rule, working
-  correctly on the (wrong) text it was actually given, cannot.
-- **1** (`"mueroom"`, a garbled OCR read of "MUD ROOM") is a genuine
-  rule-logic bug independent of OCR quality: it contains the literal
-  substring `"room"`, so it's classified `rooms` — but a *perfectly*
-  OCR'd `"mud room"` would trigger the exact same false match, since the
-  rule can't distinguish "mud room" from "bedroom."
-
-Cross-checked against crop geometry: boxes with empty OCR text averaged
-28×14px; boxes OCR successfully read averaged 57×17px. Visual review
-confirmed this wasn't "the text was illegible" — `"DINING"`, `"BATH"`,
-`"CARPORT"`, `"WIC"` were all clearly readable by eye at 5× upscale on
-crops where EasyOCR returned nothing. **Baseline conclusion: the
-bottleneck was OCR recall on small crops, not the classification rules.**
-
-## Implemented: `prepare_ocr_crop` (padding + upscaling before OCR)
-
-Per the baseline's own recommendation ("look at the crop/OCR step first
-... re-run this same eval afterward"), added `prepare_ocr_crop()` in
-`src/floorplan.py`, wired into `parse_floorplan()` in place of the bare
-`img_pil.crop(...)`:
-
-- **Pad** each detected box by 15% a side (min 2px) before cropping — a
-  tight YOLO box can clip a character's edge.
-- **Upscale** (LANCZOS) so the crop is at least 48px tall, capped at 6x
-  to avoid blowing up already-adequate crops into blur.
-
-`scripts/eval_floorplan_classifier.py` was updated to call the same
-function, so the eval and the production pipeline share one
-implementation rather than two that could drift apart — same principle
-already applied to `classify_room_label`.
-
-**Re-measured on the identical held-out split** (same 15 images, same
-seed; box detection is deterministic so the same 282 boxes came back in
-the same order — ground truth was carried over by `(image, box_index)`,
-not relabeled from scratch).
-
-### Post-fix confusion matrix
+### After
 
 | true \ pred | kitchens | bathrooms | halls | rooms | others | support |
 |---|---|---|---|---|---|---|
@@ -193,70 +241,27 @@ not relabeled from scratch).
 | **rooms** | 0 | 0 | 0 | 19 | 17 | 36 |
 | **others** | 0 | 1 | 0 | 2 | 168 | 171 |
 
-### Post-fix per-class precision / recall, next to baseline
+Accuracy: 211/272 = 0.78 (N=272). Empty-OCR-rate: 128/272 (47%) → 30/272
+(11%) — consistent in direction and magnitude with the full-set primary
+result above (33.6%→10.7%), which is expected since this subset is
+contained within the full set, not an independent check of it.
 
-| class | precision (before → after) | recall (before → after) | support |
-|---|---|---|---|
-| kitchens | 1.00 → 1.00 | 0.41 → **0.65** | 17 |
-| bathrooms | 1.00 → 0.90 | 0.22 → 0.28 | 32 |
-| halls | 1.00 → 1.00 | 0.25 → 0.25 | 16 |
-| rooms | 0.93 → 0.79 | 0.39 → **0.53** | 36 |
-| others | 0.71 → 0.75 | 0.99 → 0.98 | 171 |
+## Recommendation (still not implemented — for sign-off)
 
-Accuracy: 202/272 (0.74) → **211/272 (0.78)**.
+The full-set numbers make the original recommendation's case *more*
+solid, not less: 100% of the classifier's errors in the original
+15-image sample traced to the OCR step, and the full-set investigation
+above adds two more confirmed substring-logic bugs (`"nooki"`/parking-
+shaped, `"pdr"` unrecognized) that only had room to surface once OCR
+recall stopped hiding them. The recommendation is unchanged: the OCR
+crop fix (implemented) was the right first move, and the substring rules
+are now the clearest next lever — specifically the newly-confirmed
+`"ki"`-anywhere and unrecognized-abbreviation gaps, plus the
+already-documented `"br"`/library-breakfast and `"room"`-inside-"mud
+room" cases. Still not implemented here, per "don't touch until you
+decide."
 
-Empty-OCR-text rate: **128/272 (47%) → 30/272 (11%)** — a 77% relative
-reduction, and the clearest confirmation the fix hit its actual target.
-
-## Investigation 3: the fix worked, but unevenly — and it has a cost
-
-**Where it clearly helped:** kitchens and rooms both gained meaningfully
-on recall (+0.24, +0.14) with kitchens holding perfect precision. Both
-rely on short, common trigger substrings (`"ki"`, `"bed"`/`"br"`) that
-survive minor residual OCR noise as long as *some* legible text comes
-back at all — which is now far more often true.
-
-**Where it didn't: halls stayed at 0.25 recall, unchanged.** Checking why
-against the actual post-fix OCR output for the 16 true-hall boxes: OCR
-recall genuinely improved here too (almost none are empty anymore), but
-`"hall"` / `"liv"` / `"great"` are longer, pickier trigger substrings than
-`"ki"` or `"bath"`, and the residual character-level noise that padding
-and upscaling didn't eliminate keeps landing on exactly those letters:
-`"living room"` → `"lming"` / `"lming room"` / `"lng"` (no `"liv"`
-survives), `"great room"` → `"geat room"` / `"grealrcom"` / `"gruid"` (no
-`"great"` survives), `"hallway"` → `"mallway"` (the leading `h` is gone,
-so no `"hall"`). The fix increased *how often* legible-ish text comes
-back; it didn't fully solve *character-level* accuracy, and halls'
-trigger words are the least tolerant of the two.
-
-**The cost: precision dropped for bathrooms (1.00→0.90) and rooms
-(0.93→0.79).** More text reaching `classify_room_label` instead of
-failing silently into `others` also means more chances for the
-substring-logic bugs to fire. Every new false positive checked by hand:
-
-- `"mubroom"` / `"mud room"` (2 instances) — the same `"mud room"`-contains-
-  `"room"` bug identified at baseline, now surfacing twice instead of once
-  because OCR actually reads "MUD ROOM" now instead of returning nothing.
-- `"lming room"` and `"geat room"` — cases where OCR recovered *enough*
-  text to trigger the generic `"room"` fallback but not enough to trigger
-  the more specific `"liv"`/`"great"` hall check that should have won.
-- `"covliiog toica"` (true: "COVERED PORCH") — a still-garbled OCR read
-  that happens to contain `"toi"`, misfiring into bathrooms.
-
-**Conclusion: this is exactly the handoff the baseline predicted.**
-Fixing OCR recall was the right first move (77% fewer total failures,
-real recall gains on 2 of 4 classes) — but it also unblocked the
-substring-logic bugs to matter more, since they can now only misfire on
-text that actually comes back. The next highest-leverage step is now the
-rules themselves: fixing the specific bugs on record (`"ki"`/parking,
-`"br"`/library-breakfast, `"room"`-inside-"mud room") and hardening the
-hall keywords against the character-level noise shown above would very
-plausibly close a meaningful chunk of the remaining gap, particularly for
-halls and rooms precision. Not implemented here — this was the OCR-layer
-recommendation specifically; the substring rules are still "don't touch
-until you decide," per the original brief.
-
-## Reproduce the post-fix numbers
+## Reproduce the post-fix 15-image numbers specifically
 
 ```bash
 docker compose build api   # picks up prepare_ocr_crop

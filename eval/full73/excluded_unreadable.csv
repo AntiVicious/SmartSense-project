@@ -1,0 +1,31 @@
+image,box_index,crop_file,raw_ocr_text,cleaned_text,predicted_class,ground_truth_class
+0_21_jpg.rf.6af5b9a82a27dab621cd2bc590048fa6.jpg,12,0_21_jpg.rf.6af5b9a82a27dab621cd2bc590048fa6_box12.jpg,,,others,unreadable
+0_30_jpg.rf.bcf0ea49d5693cfb9bf9fd3efb73181b.jpg,15,0_30_jpg.rf.bcf0ea49d5693cfb9bf9fd3efb73181b_box15.jpg,3-0 *,,others,unreadable
+0_30_jpg.rf.bcf0ea49d5693cfb9bf9fd3efb73181b.jpg,16,0_30_jpg.rf.bcf0ea49d5693cfb9bf9fd3efb73181b_box16.jpg,,,others,unreadable
+0_30_jpg.rf.bcf0ea49d5693cfb9bf9fd3efb73181b.jpg,17,0_30_jpg.rf.bcf0ea49d5693cfb9bf9fd3efb73181b_box17.jpg,,,others,unreadable
+0_30_jpg.rf.bcf0ea49d5693cfb9bf9fd3efb73181b.jpg,20,0_30_jpg.rf.bcf0ea49d5693cfb9bf9fd3efb73181b_box20.jpg,,,others,unreadable
+0_30_jpg.rf.bcf0ea49d5693cfb9bf9fd3efb73181b.jpg,22,0_30_jpg.rf.bcf0ea49d5693cfb9bf9fd3efb73181b_box22.jpg,6-0 * 5-2,,others,unreadable
+10_11_jpg.rf.8ff1f89249b54f8ecfd63ff673fb8e94.jpg,13,10_11_jpg.rf.8ff1f89249b54f8ecfd63ff673fb8e94_box13.jpg,,,others,unreadable
+10_1_jpg.rf.bd84eadbb9bbd576dea04e07ccf4f503.jpg,11,10_1_jpg.rf.bd84eadbb9bbd576dea04e07ccf4f503_box11.jpg,94x154_,x,others,unreadable
+10_1_jpg.rf.bd84eadbb9bbd576dea04e07ccf4f503.jpg,13,10_1_jpg.rf.bd84eadbb9bbd576dea04e07ccf4f503_box13.jpg,12x154,x,others,unreadable
+10_21_jpg.rf.cdc2b334287b64744b80fa37e5125068.jpg,22,10_21_jpg.rf.cdc2b334287b64744b80fa37e5125068_box22.jpg,,,others,unreadable
+10_21_jpg.rf.cdc2b334287b64744b80fa37e5125068.jpg,23,10_21_jpg.rf.cdc2b334287b64744b80fa37e5125068_box23.jpg,176*6.0,,others,unreadable
+10_21_jpg.rf.cdc2b334287b64744b80fa37e5125068.jpg,26,10_21_jpg.rf.cdc2b334287b64744b80fa37e5125068_box26.jpg,,,others,unreadable
+15_16_jpg.rf.f5b82e4f8b242a5c0756c2d2d8bf3851.jpg,13,15_16_jpg.rf.f5b82e4f8b242a5c0756c2d2d8bf3851_box13.jpg,10-0x7-7,x,others,unreadable
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,18,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box18.jpg,,,others,unreadable
+16_11_jpg.rf.e0a76b0fba37d1b966021491bf85cd68.jpg,26,16_11_jpg.rf.e0a76b0fba37d1b966021491bf85cd68_box26.jpg,48,,others,unreadable
+17_20_jpg.rf.6a7519e5f441883845fe01686d458fdc.jpg,8,17_20_jpg.rf.6a7519e5f441883845fe01686d458fdc_box8.jpg,Rm#-,rm,others,unreadable
+17_27_jpg.rf.1b93ca0340c2e373919734f08b7090cf.jpg,14,17_27_jpg.rf.1b93ca0340c2e373919734f08b7090cf_box14.jpg,S,s,others,unreadable
+17_27_jpg.rf.1b93ca0340c2e373919734f08b7090cf.jpg,15,17_27_jpg.rf.1b93ca0340c2e373919734f08b7090cf_box15.jpg,,,others,unreadable
+17_2_jpg.rf.ccea6ab27573eacace1ab9810159f300.jpg,13,17_2_jpg.rf.ccea6ab27573eacace1ab9810159f300_box13.jpg,,,others,unreadable
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,20,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box20.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,10,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box10.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,15,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box15.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,16,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box16.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,18,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box18.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,22,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box22.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,23,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box23.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,24,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box24.jpg,,,others,unreadable
+41_20_jpg.rf.52670166d23cb4b3e4d5140d41227bc7.jpg,12,41_20_jpg.rf.52670166d23cb4b3e4d5140d41227bc7_box12.jpg,,,others,unreadable
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,30,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box30.jpg,,,others,unreadable
+66_6_jpg.rf.2bbd0923857fe025ca96d559913b98ef.jpg,23,66_6_jpg.rf.2bbd0923857fe025ca96d559913b98ef_box23.jpg,,,others,unreadable

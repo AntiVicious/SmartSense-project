@@ -364,16 +364,35 @@ the same number:
   The trained model reached **99.3%** mAP@.5 on the validation split.
 - **End-to-end room-count accuracy**: whether the full YOLO+OCR+classifier
   pipeline gets the actual room counts right — a mAP score doesn't capture
-  OCR or classification errors downstream of detection. This hasn't been
-  measured rigorously against a held-out labeled set yet (the substring
-  classifier's known false positives are documented and pinned by tests,
-  not yet fixed or scored).
+  OCR or classification errors downstream of detection. Measured against
+  hand-labeled ground truth over **all 73 images in `data/images/`**
+  (N=1220 detected boxes; full methodology and confusion matrices in
+  `eval/REPORT.md`). The headline number is **OCR recall, not
+  classification accuracy**: the fraction of detected boxes where EasyOCR
+  returned *no* text at all (which `classify_room_label` can only ever
+  bucket as `others`, regardless of what the text actually said) fell
+  from **410/1220 (33.6%) to 131/1220 (10.7%)** after padding and
+  upscaling each crop before OCR (`prepare_ocr_crop`, `src/floorplan.py`).
+  Overall accuracy moved from 943/1190 to 969/1190 (0.79 → 0.81, N=1190
+  scored boxes) — a real, statistically significant improvement (paired
+  test, p=0.003), but a secondary number: `classify_room_label`'s
+  substring rules (documented, known-imperfect — see
+  `tests/test_floorplan_classification.py`) are still unfixed, and
+  `eval/REPORT.md` found the larger sample surfaces more of their bugs,
+  not fewer, once OCR stops hiding them.
 
 The training run originally produced two checkpoints (300 and 1000 epochs).
-Both were benchmarked against a hand-labeled sample of `data/images/`; the
-1000-epoch model had ~19% lower error and won 7 of 16 head-to-head
-comparisons to the 300-epoch model's 2, so the 300-epoch checkpoint was
-deleted rather than kept alongside it.
+Both were benchmarked on room_name detection *count* — |predicted count -
+hand-counted true count| per image, not an OCR/classification metric —
+against N=16 hand-labeled images (of 73 total; script and full
+methodology in `scripts/benchmark_yolo_checkpoints.py`,
+`eval/yolo_checkpoint_benchmark.md`). Out of 16: **the 1000-epoch model
+won 7, the 300-epoch model won 2, and 7 tied** — a 7:2 edge among the 9
+decided comparisons, not a 7/16 minority as it reads without the tie
+count spelled out. Mean absolute error was 2.75/image (1000-epoch) vs.
+3.38/image (300-epoch), ~19% lower. The 300-epoch checkpoint was deleted
+on that basis; re-deriving the comparison from the original raw
+detections reproduced the same numbers exactly, so the decision holds.
 
 `notebooks/train.ipynb` has the full training/preprocessing code (COCO ->
 YOLO format conversion, the train/val split, the training call).
