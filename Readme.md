@@ -144,17 +144,13 @@ Qdrant: A single document (containing the title, description, and extracted PDF 
 **Phase 3: Multi-Agent Chatbot**
 The chatbot is a Tool-Calling Agent built with LangChain, which acts as the Query Router and Task Planner. It uses the Groq llama-3.1-70b-versatile LLM to decide which tool to use.
 
-The agent has access to 5 specialized tools:
+The agent has access to 3 specialized tools:
 
 structured_property_search (Real): An SQL Agent that connects to the PostgreSQL database to answer factual questions (e.g., "find 3-bedroom houses under 80 Lakhs").
 
 unstructured_property_search (Real): A RAG Agent that connects to Qdrant to answer semantic questions (e.g., "find properties with a gym and good security").
 
-web_researcher (Real): A tool using the Tavily API to get live web data (e.g., "what's the current market trend in Hyderabad?").
-
 generate_property_report (Real): A custom tool that queries the SQL database to generate a formatted markdown report of properties.
-
-renovation_estimator (Mock): A placeholder tool that returns a JSON object with a mock cost.
 
 Memory: Conversational memory is implemented by passing the st.session_state chat history to the agent with each turn.
 
