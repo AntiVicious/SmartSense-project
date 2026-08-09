@@ -56,7 +56,7 @@ POSTGRES_DB=real_estate_db
 | Excel/CSV | `data/` | e.g. `Property_list.xlsx` |
 | Floorplan images | `data/images/` | referenced by the `image_file` column |
 | Certificate PDFs | `data/certificates/` | referenced by the `certificates` column |
-| Model weights | `src/best_1000.pt` | see [Model weights](#model-weights) below |
+| Model weights | `src/best_1000.pt` | fetched automatically by Docker — see [Model weights](#model-weights) below |
 
 ### 4. Run it
 
@@ -100,9 +100,8 @@ SmartSense-project/
 │   ├── agents.py            # LangChain tool definitions + agent assembly
 │   ├── ingest.py            # Excel -> Postgres + Qdrant ingestion pipeline
 │   ├── main.py               # Streamlit UI
-│   ├── Dockerfile
-│   ├── run.sh                # launches FastAPI + Streamlit in one container
-│   └── best_1000.pt          # trained YOLOv8 weights
+│   ├── Dockerfile             # fetches best_1000.pt from a GitHub release at build time
+│   └── run.sh                 # launches FastAPI + Streamlit in one container
 │
 ├── tests/                    # pytest-discoverable; see Development below
 ├── notebooks/
@@ -212,7 +211,21 @@ every push to `main`.
 
 ## Model weights
 
-`src/best_1000.pt` (~67MB) is currently committed directly to the repo. A
-follow-up will move it to Git LFS, a GitHub release asset, or a Hugging
-Face model repo instead — see the project's internal notes for the
-tradeoffs under consideration.
+`best_1000.pt` (~67MB) isn't committed to git. It's published as a
+[GitHub release asset](https://github.com/AntiVicious/SmartSense-project/releases/tag/model-weights-v1),
+and `src/Dockerfile` downloads it at build time (pinned to that release
+tag and a SHA256 checksum, so a build never silently picks up a
+different file).
+
+- **Building with Docker**: nothing to do — `docker compose up --build`
+  fetches it automatically.
+- **Running outside Docker** (e.g. `notebooks/train.ipynb`, or calling
+  `src/floorplan.py` directly): download it yourself and place it at
+  `src/best_1000.pt`:
+  ```bash
+  curl -L -o src/best_1000.pt \
+    https://github.com/AntiVicious/SmartSense-project/releases/download/model-weights-v1/best_1000.pt
+  ```
+- **Publishing a retrained model**: create a new release tag, upload the
+  new `.pt` file as its asset, and update `MODEL_WEIGHTS_URL`/
+  `MODEL_WEIGHTS_SHA256` in `src/Dockerfile` to match.

@@ -14,6 +14,10 @@ requirements-dev.txt
 setup.cfg
 smartsense-fix-list.md
 
+# Model weights are fetched from a GitHub release at build time (see
+# src/Dockerfile) — never bake in whatever happens to be on disk locally.
+src/*.pt
+
 # Python
 __pycache__/
 *.py[cod]
