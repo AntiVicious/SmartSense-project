@@ -18,7 +18,19 @@ from .floorplan import parse_floorplan
 from .models import Property
 
 
-def ingest_properties_sync(file_contents: bytes, *, session_factory, qdrant_client, embedder, qdrant_collection: str) -> dict:
+def ingest_properties_sync(
+    file_contents: bytes,
+    *,
+    session_factory,
+    qdrant_client,
+    embedder,
+    qdrant_collection: str,
+    parse_floorplan_fn=parse_floorplan,
+    parse_local_pdf_fn=parse_local_pdf,
+) -> dict:
+    """parse_floorplan_fn/parse_local_pdf_fn default to the real YOLO/OCR
+    and PyMuPDF-backed parsers -- production callers never need to pass
+    them. Tests inject fakes here instead of loading real models."""
     db = session_factory()
     try:
         df = pd.read_excel(io.BytesIO(file_contents))
@@ -49,7 +61,7 @@ def ingest_properties_sync(file_contents: bytes, *, session_factory, qdrant_clie
             # Construct the local path to the image
             local_image_path = os.path.join("/app/data/images", str(image_filename))
 
-            floorplan_data = parse_floorplan(local_image_path)
+            floorplan_data = parse_floorplan_fn(local_image_path)
             if floorplan_data.get("error"):
                 print(f"Skipping row {index}: {floorplan_data['error']}")
                 continue
@@ -62,7 +74,7 @@ def ingest_properties_sync(file_contents: bytes, *, session_factory, qdrant_clie
                     if link and link.strip().lower().endswith('.pdf'):
                         print(f"Found PDF link: {link.strip()}")
                         pdf_path = os.path.join("/app/data/certificates", link.strip())
-                        report_text += parse_local_pdf(pdf_path) + "\n\n"
+                        report_text += parse_local_pdf_fn(pdf_path) + "\n\n"
             # ---------------------------------
 
             db_property = Property(
