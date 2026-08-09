@@ -1,0 +1,40 @@
+# Version control (this alone can be large — history includes the
+# committed model weights)
+.git
+.github
+.gitignore
+.gitattributes
+.dockerignore
+
+# Not needed at runtime
+notebooks/
+tests/
+*.md
+requirements-dev.txt
+setup.cfg
+smartsense-fix-list.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Secrets / editors / OS
+.env
+.env.example
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
