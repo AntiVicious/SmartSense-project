@@ -63,7 +63,5 @@ def get_internal_api_config() -> tuple[str, str]:
     base_url = f"http://{conn.host}:{conn.port}" if conn.port else f"http://{conn.host}"
     api_key = conn.extra_dejson.get("api_key")
     if not api_key:
-        raise RuntimeError(
-            f"Airflow connection {INTERNAL_API_CONN_ID!r} has no 'api_key' in its extra field"
-        )
+        raise RuntimeError(f"Airflow connection {INTERNAL_API_CONN_ID!r} has no 'api_key' in its extra field")
     return base_url, api_key

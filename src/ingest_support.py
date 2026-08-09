@@ -5,12 +5,33 @@ module needs to stay importable without it. Stdlib only.
 """
 
 import hashlib
+import os
 import uuid
 
 # Fixed namespace so qdrant_point_id(external_id) is stable across
 # processes and re-runs -- any fixed UUID works, this one has no special
 # meaning beyond being constant.
 _QDRANT_POINT_NAMESPACE = uuid.UUID("f47ac10b-58cc-4372-a567-0e02b2c3d479")
+
+
+def ensure_shared_dir(path: str) -> None:
+    """Creates path if missing and makes it world-writable.
+
+    This directory is written to by multiple containers running as
+    different UIDs (the app as root, Airflow as uid 50000) sharing one
+    bind-mounted host volume. Whichever container creates it first has to
+    leave it writable for the others -- a non-owning, non-root process
+    can't chmod its way out of a directory someone else created with a
+    restrictive mode, it can only fail. Not a security boundary: this is
+    internal scratch space on the Docker network, never internet-facing.
+    """
+    os.makedirs(path, exist_ok=True)
+    try:
+        os.chmod(path, 0o777)
+    except PermissionError:
+        # Created by a different UID and this process doesn't own it --
+        # whatever mode it already has is what it's going to have.
+        pass
 
 
 def compute_external_id(title, location, image_file) -> str:

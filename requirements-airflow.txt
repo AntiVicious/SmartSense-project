@@ -1,0 +1,13 @@
+# Deliberately no torch/ultralytics/easyocr/sentence-transformers/
+# langchain -- floorplan parsing and embeddings run in the app container
+# via /internal/parse-floorplan and /internal/embed instead (see
+# dags/support.py). This keeps the Airflow image an order of magnitude
+# smaller and avoids installing PyTorch twice.
+sqlalchemy
+psycopg2-binary
+pandas
+pyarrow
+openpyxl
+PyMuPDF
+requests
+qdrant-client>=1.7,<1.12

@@ -9,6 +9,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+from .ingest_support import ensure_shared_dir
 from .models import IngestJob
 
 ALLOWED_SUFFIXES = {".xlsx", ".xls", ".csv"}
@@ -36,7 +37,9 @@ def land_ingest_file(
 
     job_id = str(uuid.uuid4())
 
-    os.makedirs(landing_dir, exist_ok=True)
+    # World-writable: the Airflow poller (a different container, a
+    # different UID) has to be able to rename files out of this directory.
+    ensure_shared_dir(landing_dir)
     dest_path = os.path.join(landing_dir, f"{job_id}{suffix}")
     with open(dest_path, "wb") as f:
         f.write(file_bytes)

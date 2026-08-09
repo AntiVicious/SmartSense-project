@@ -54,9 +54,17 @@ from dags.support import (  # noqa: E402
     get_postgres_engine,
     get_qdrant_client,
 )
-from src.ingest_support import compute_external_id, qdrant_point_id  # noqa: E402
+from src.ingest_support import compute_external_id, ensure_shared_dir, qdrant_point_id  # noqa: E402
 
-REQUIRED_COLUMNS = ["title", "location", "price", "image_file", "listing_date", "certificates", "long_description"]
+REQUIRED_COLUMNS = [
+    "title",
+    "location",
+    "price",
+    "image_file",
+    "listing_date",
+    "certificates",
+    "long_description",
+]
 
 
 def _update_job_status(job_id, *, status, rows_ingested=None, error_message=None):
@@ -70,7 +78,12 @@ def _update_job_status(job_id, *, status, rows_ingested=None, error_message=None
                 "UPDATE ingest_jobs SET status = :status, rows_ingested = :rows_ingested, "
                 "error_message = :error_message, updated_at = now() WHERE job_id = :job_id"
             ),
-            {"status": status, "rows_ingested": rows_ingested, "error_message": error_message, "job_id": job_id},
+            {
+                "status": status,
+                "rows_ingested": rows_ingested,
+                "error_message": error_message,
+                "job_id": job_id,
+            },
         )
 
 
@@ -80,10 +93,18 @@ def _on_dag_success(context):
     _update_job_status(job_id, status="succeeded", rows_ingested=rows_ingested)
 
 
-def _on_dag_failure(context):
+def _on_task_failure(context):
+    # Deliberately a *task*-level callback (wired in via default_args
+    # below), not the DAG-level on_failure_callback -- context["exception"]
+    # is only reliably populated at task granularity. A DAG-level failure
+    # callback's context doesn't carry the originating task's exception,
+    # so it can't do better than "something failed" -- this can name what
+    # and why.
     job_id = (context["dag_run"].conf or {}).get("job_id")
     exception = context.get("exception")
-    _update_job_status(job_id, status="failed", error_message=str(exception)[:2000] if exception else "unknown error")
+    task_id = context["task_instance"].task_id
+    message = f"{task_id}: {exception}" if exception else f"{task_id}: unknown error"
+    _update_job_status(job_id, status="failed", error_message=message[:2000])
 
 
 @dag(
@@ -97,9 +118,9 @@ def _on_dag_failure(context):
         "retry_delay": timedelta(minutes=2),
         "retry_exponential_backoff": True,
         "max_retry_delay": timedelta(minutes=15),
+        "on_failure_callback": _on_task_failure,
     },
     on_success_callback=_on_dag_success,
-    on_failure_callback=_on_dag_failure,
     tags=["ingest"],
 )
 def ingest_properties():
@@ -118,7 +139,7 @@ def ingest_properties():
             df = pd.read_excel(spreadsheet_path)
 
         staging_dir = os.path.join(STAGING_ROOT, job_id)
-        os.makedirs(staging_dir, exist_ok=True)
+        ensure_shared_dir(staging_dir)
         staging_path = os.path.join(staging_dir, "01_extracted.parquet")
         df.to_parquet(staging_path)
 
@@ -129,27 +150,22 @@ def ingest_properties():
     def validate_data_quality(extract_result: dict) -> dict:
         import pandas as pd
 
+        from src.data_quality import DataQualityError, check_data_quality
+
         df = pd.read_parquet(extract_result["staging_path"])
 
         min_rows = int(Variable.get("ingest_dq_min_rows", default_var=1))
         null_rate_threshold = float(Variable.get("ingest_dq_null_rate_threshold", default_var=0.2))
 
-        if len(df) < min_rows:
-            raise AirflowFailException(f"Data quality: {len(df)} rows, minimum is {min_rows}")
-
-        missing_columns = [c for c in REQUIRED_COLUMNS if c not in df.columns]
-        if missing_columns:
-            raise AirflowFailException(f"Data quality: missing required column(s) {missing_columns}")
-
-        for col in ("title", "location", "price"):
-            null_rate = df[col].isna().mean()
-            if null_rate > null_rate_threshold:
-                raise AirflowFailException(
-                    f"Data quality: column {col!r} is {null_rate:.0%} null (threshold {null_rate_threshold:.0%})"
-                )
-
-        if df["image_file"].isna().all():
-            raise AirflowFailException("Data quality: image_file is null for every row -- nothing to parse")
+        try:
+            check_data_quality(
+                df,
+                required_columns=REQUIRED_COLUMNS,
+                min_rows=min_rows,
+                null_rate_threshold=null_rate_threshold,
+            )
+        except DataQualityError as e:
+            raise AirflowFailException(f"Data quality: {e}")
 
         print(f"Data quality checks passed for {len(df)} rows")
         return extract_result
@@ -309,7 +325,9 @@ def ingest_properties():
                     "description": row.get("long_description"),
                     "location": row.get("location"),
                     "price": None if pd.isna(row.get("price")) else float(row.get("price")),
-                    "listing_date": None if pd.isna(row.get("listing_date")) else str(row.get("listing_date")),
+                    "listing_date": (
+                        None if pd.isna(row.get("listing_date")) else str(row.get("listing_date"))
+                    ),
                     "certifications_link": row.get("certificates"),
                     "floorplan_image_url": row.get("image_file"),
                     "rooms": row.get("rooms"),
@@ -342,7 +360,11 @@ def ingest_properties():
             found_in_postgres = {row[0] for row in result}
 
         point_ids = [qdrant_point_id(eid) for eid in external_ids]
-        retrieved = client.retrieve(collection_name=QDRANT_COLLECTION, ids=point_ids, with_payload=True) if point_ids else []
+        retrieved = (
+            client.retrieve(collection_name=QDRANT_COLLECTION, ids=point_ids, with_payload=True)
+            if point_ids
+            else []
+        )
         found_in_qdrant = {p.payload.get("external_id") for p in retrieved}
 
         staged = set(external_ids)

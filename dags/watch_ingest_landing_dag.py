@@ -28,6 +28,7 @@ import sqlalchemy as sa  # noqa: E402
 from airflow.decorators import dag, task  # noqa: E402
 
 from dags.support import INGEST_LANDING_DIR, get_postgres_engine  # noqa: E402
+from src.ingest_support import ensure_shared_dir  # noqa: E402
 
 CLAIMED_DIR = os.path.join(INGEST_LANDING_DIR, "_claimed")
 
@@ -74,7 +75,7 @@ def watch_ingest_landing():
             print(f"No ingest_jobs row for job_id={job_id!r}; leaving {file_info['path']} untouched")
             return
 
-        os.makedirs(CLAIMED_DIR, exist_ok=True)
+        ensure_shared_dir(CLAIMED_DIR)
         claimed_path = os.path.join(CLAIMED_DIR, file_info["filename"])
         try:
             # Atomic on the same filesystem: after this, the file either

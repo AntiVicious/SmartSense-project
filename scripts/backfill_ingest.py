@@ -77,7 +77,10 @@ def main() -> int:
         return 1
 
     job_ids = backfill_directory(directory)
-    print(f"\nLanded {len(job_ids)} file(s). watch_ingest_landing picks them up on its next run (every 1 minute).")
+    print(
+        f"\nLanded {len(job_ids)} file(s). watch_ingest_landing picks them up "
+        "on its next run (every 1 minute)."
+    )
     return 0
 
 
