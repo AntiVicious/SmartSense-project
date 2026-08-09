@@ -21,6 +21,35 @@ _yolo_model = None  # Lazy-load the YOLO model
 _ocr_reader = None  # Lazy-load the OCR model
 
 
+def classify_room_label(detected_text: str) -> str:
+    """Classify a cleaned OCR label into one of the room-count buckets.
+
+    detected_text must already be lowercased and stripped down to letters
+    and whitespace (see the re.sub call in parse_floorplan below) -- this
+    function does no cleaning itself, matching how the classification was
+    always invoked inline before it was pulled out as its own function.
+
+    Branch order is significant, not just style: "bathroom" contains both
+    "bath" and "room", and only resolves to "bathrooms" because the
+    bathroom check runs before the room check. Several of these substring
+    checks also false-positive on unrelated words -- "ki" matches
+    "parking", "br" matches "library" and "breakfast" -- see the tests in
+    tests/test_floorplan_classification.py, which document the current
+    (imperfect) behavior rather than silently rely on it.
+    """
+    if "ki" in detected_text:
+        return "kitchens"
+    elif "bath" in detected_text or "wc" in detected_text or "wash" in detected_text or "toi" in detected_text or "powder" in detected_text:
+        return "bathrooms"
+    elif "hall" in detected_text or "liv" in detected_text or "great" in detected_text:
+        return "halls"
+    elif "bed" in detected_text or "room" in detected_text or "br" in detected_text:
+        # This is a general "room", e.g., bedroom
+        return "rooms"
+    else:
+        return "others"
+
+
 def parse_floorplan(local_image_path: str) -> dict:
     global _yolo_model, _ocr_reader
 
@@ -79,18 +108,7 @@ def parse_floorplan(local_image_path: str) -> dict:
                     detected_text = re.sub(r'[^a-z\s]', '', detected_text).strip()
                     print(f"  > Detected label '{label}' -> OCR Text: '{detected_text}'")
 
-                    # --- Simple classification based on text ---
-                    if "ki" in detected_text:
-                        counts["kitchens"] += 1
-                    elif "bath" in detected_text or "wc" in detected_text or "wash" in detected_text or "toi" in detected_text or "powder" in detected_text:
-                        counts["bathrooms"] += 1
-                    elif "hall" in detected_text or "liv" in detected_text or "great" in detected_text:
-                        counts["halls"] += 1
-                    elif "bed" in detected_text or "room" in detected_text or "br" in detected_text:
-                        # This is a general "room", e.g., bedroom
-                        counts["rooms"] += 1
-                    else:
-                        counts["others"] += 1
+                    counts[classify_room_label(detected_text)] += 1
 
 
     json_output = {
