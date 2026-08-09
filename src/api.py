@@ -11,8 +11,9 @@ import easyocr      # For OCR
 import fitz
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
-from sqlalchemy import create_engine, Column, Integer, String, Float, Text
+from sqlalchemy import create_engine, Column, Integer, String, Float, Text, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams, PointStruct
@@ -219,26 +220,20 @@ async def lifespan(app: FastAPI):
     print("FastAPI is starting up, waiting for databases...")
     
     # 1. Create Qdrant Collection (idempotent — do NOT wipe data on restart)
-    try:
-        existing = {c.name for c in qdrant_client.get_collections().collections}
-        if QDRANT_VECTOR_COLLECTION in existing:
-            print(f"Qdrant collection '{QDRANT_VECTOR_COLLECTION}' already exists. Reusing.")
-        else:
-            qdrant_client.create_collection(
-                collection_name=QDRANT_VECTOR_COLLECTION,
-                vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.COSINE),
-            )
-            print(f"Qdrant collection '{QDRANT_VECTOR_COLLECTION}' created.")
-    except Exception as e:
-        print(f"Qdrant setup failed: {e}")
+    existing = {c.name for c in qdrant_client.get_collections().collections}
+    if QDRANT_VECTOR_COLLECTION in existing:
+        print(f"Qdrant collection '{QDRANT_VECTOR_COLLECTION}' already exists. Reusing.")
+    else:
+        qdrant_client.create_collection(
+            collection_name=QDRANT_VECTOR_COLLECTION,
+            vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.COSINE),
+        )
+        print(f"Qdrant collection '{QDRANT_VECTOR_COLLECTION}' created.")
 
     # 2. Create PostgreSQL Tables
-    try:
-        Base.metadata.create_all(bind=engine)
-        print("Tables created successfully.")
-    except Exception as e:
-        print(f"Error creating tables: {e}")
-    
+    Base.metadata.create_all(bind=engine)
+    print("Tables created successfully.")
+
     # 3. Initialize ALL database-dependent agents
     print("Initializing agents...")
     llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0, api_key=GROQ_API_KEY)
@@ -378,6 +373,38 @@ app = FastAPI(title="Real-Estate API", lifespan=lifespan)
 def read_root():
     """Root endpoint for health checks."""
     return {"status": "ok", "message": "Backend is running!"}
+
+@app.get("/health")
+def health_check(request: Request):
+    checks = {}
+    healthy = True
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        checks["postgres"] = True
+    except Exception as e:
+        print(f"Health check: Postgres connectivity failed: {e}")
+        checks["postgres"] = False
+        healthy = False
+
+    try:
+        qdrant_client.get_collections()
+        checks["qdrant"] = True
+    except Exception as e:
+        print(f"Health check: Qdrant connectivity failed: {e}")
+        checks["qdrant"] = False
+        healthy = False
+
+    checks["agent_executor"] = getattr(request.app.state, "agent_executor", None) is not None
+    if not checks["agent_executor"]:
+        healthy = False
+
+    status_code = 200 if healthy else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={"status": "ok" if healthy else "unhealthy", "checks": checks},
+    )
 
 class ChatRequest(BaseModel):
     query: str
