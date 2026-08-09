@@ -34,7 +34,7 @@ It integrates:
 #### Clone the Repository
 ```bash
 git clone [Your-Repo-URL]
-cd real-estate-search
+cd SmartSense-project
 ```
 
 #### Set Up Environment File
@@ -76,7 +76,7 @@ docker-compose up --build
 
 ## 📁 Project Structure
 ```
-real-estate-search/
+SmartSense-project/
 ├── src/
 │   ├── api.py               # FastAPI backend (agents, ingestion logic)
 │   ├── main.py              # Streamlit frontend (UI)
