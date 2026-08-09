@@ -36,7 +36,6 @@ from langchain.chains import RetrievalQA
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_community.utilities import SQLDatabase
 from langchain_community.agent_toolkits import create_sql_agent, SQLDatabaseToolkit
-from langchain_community.tools.tavily_search import TavilySearchResults  # <-- ADD THIS LINE
 
 # --- 1. Environment & Config (Using Docker Service Names) ---
 POSTGRES_USER = os.getenv("POSTGRES_USER")
@@ -246,13 +245,6 @@ async def lifespan(app: FastAPI):
     rag_chain = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=vector_store.as_retriever())
     rag_search_tool = Tool(name="unstructured_property_search", func=rag_chain.invoke, description="Use to search property descriptions for semantic info like 'family-friendly' or 'good view'.")
     
-    # --- Tool 4: Web Research Agent (REAL) ---
-    # TAVILY_API_KEY is read automatically from the environment by the tool.
-    # NOTE: the param is `max_results`, not `k` — `k=...` is silently swallowed.
-    web_search_tool = TavilySearchResults(max_results=3)
-    web_search_tool.name = "web_researcher" # Give it the same name as the old tool
-    web_search_tool.description = "A search engine for finding real-time information, market rates, or neighborhood details."
-
     @tool
     def generate_property_report(location: str = None, min_price: float = None, max_price: float = None, min_rooms: int = None) -> str:
         """
@@ -319,14 +311,13 @@ async def lifespan(app: FastAPI):
 
     # --- Assemble Agent ---
     # --- Assemble Agent ---
-    tools = [sql_search_tool, rag_search_tool, web_search_tool, generate_property_report]
+    tools = [sql_search_tool, rag_search_tool, generate_property_report]
     
     # --- THIS IS THE FIX: A more robust system prompt ---
     system_prompt = """You are a specialized real-estate assistant.
 Your goal is to answer questions about properties using the tools provided.
 You can use the 'structured_property_search' tool for facts like price, location, and room counts.
 You can use the 'unstructured_property_search' tool for more general questions about descriptions, neighborhoods, or report details.
-You can use the 'web_researcher' for current market trends.
 
 If the user asks a question that is NOT related to real estate, properties, or your other tools,
 and it is NOT a simple greeting (like 'hello'), you MUST respond with this exact sentence:

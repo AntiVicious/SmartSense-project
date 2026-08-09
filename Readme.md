@@ -24,8 +24,7 @@ It integrates:
 - **Docker & Docker Compose** (installed and running)
 - **Git**
 - **API Keys**
-  - [Groq](https://groq.com/) → for LLM  
-  - [Tavily](https://tavily.com/) → for web search
+  - [Groq](https://groq.com/) → for LLM
 
 ---
 
@@ -45,7 +44,6 @@ cp .env.example .env
 Edit `.env` with your API keys:
 ```bash
 GROQ_API_KEY=gsk_...
-TAVILY_API_KEY=tvly_...
 
 # Default database credentials (optional to change)
 POSTGRES_USER=myuser
