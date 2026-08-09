@@ -1,0 +1,16 @@
+# Deliberately a separate, lean image from src/Dockerfile.api -- the
+# Streamlit UI only ever talks to the api service over HTTP (see main.py's
+# API_BASE_URL), so it has no reason to carry torch/ultralytics/easyocr/
+# langchain or the model weights. Splitting this out (fix-list 2.1) is also
+# what makes "the container is up" actually mean "the process users hit is
+# up" -- previously run.sh backgrounded uvicorn and foregrounded Streamlit
+# in one container, so a dead backend didn't make the container unhealthy.
+FROM python:3.10-slim
+WORKDIR /app
+
+COPY requirements-ui.txt .
+RUN pip install --no-cache-dir -r requirements-ui.txt
+
+COPY src/main.py ./src/main.py
+
+CMD ["python", "-m", "streamlit", "run", "src/main.py", "--server.port", "8501", "--server.address", "0.0.0.0"]

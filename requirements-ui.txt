@@ -1,0 +1,5 @@
+# Streamlit UI only -- deliberately does not install requirements.txt or
+# requirements-heavy.txt. main.py talks to the api service over HTTP; it
+# never imports torch/ultralytics/easyocr/langchain/sqlalchemy directly.
+streamlit
+requests
