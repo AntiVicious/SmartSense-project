@@ -1,4 +1,5 @@
 import os
+import tempfile
 import pandas as pd
 import requests
 import torch
@@ -502,11 +503,16 @@ async def ingest_properties(file: UploadFile = File(...), model_name: str = "bes
 
 @app.post("/parse-floorplan-debug")
 async def parse_floorplan_debug(file: UploadFile = File(...), model_name: str = "best_1000.pt"):
-    file_path = f"/tmp/{file.filename}"
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
-    
-    # We must use the local filesystem path
-    data = parse_floorplan(file_path, model_name)
+    contents = await file.read()
+
+    # Never trust the client-supplied filename as a path (path traversal) —
+    # write to a generated temp path instead, and always clean it up.
+    fd, file_path = tempfile.mkstemp(dir="/tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(contents)
+        data = parse_floorplan(file_path, model_name)
+    finally:
+        os.remove(file_path)
 
     return data
