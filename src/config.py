@@ -37,6 +37,15 @@ class Settings(BaseSettings):
     # --- Embeddings ---
     EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
 
+    # --- Internal API (Airflow -> app calls for floorplan parsing / embedding) ---
+    # Required, no default: these endpoints run real inference on request,
+    # so an unset key should fail startup loudly rather than leave them
+    # reachable with a guessable default.
+    INTERNAL_API_KEY: str
+
+    # --- Ingest landing directory (file-drop trigger for the Airflow DAGs) ---
+    INGEST_LANDING_DIR: str = "/app/data/_incoming"
+
     @property
     def database_url(self) -> str:
         return (
