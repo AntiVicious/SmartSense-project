@@ -23,6 +23,10 @@ env/
 .coverage
 htmlcov/
 
+# Ingest pipeline runtime dirs -- not part of the tracked sample dataset
+data/_incoming/
+data/_staging/
+
 # Editors / OS
 .vscode/
 .idea/

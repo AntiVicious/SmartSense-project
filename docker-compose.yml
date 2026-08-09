@@ -58,6 +58,10 @@ services:
 
     volumes:          # <-- ADD THIS SECTION
       - ./data:/app/data
+      # Not baked into the image (it's an occasional operational script,
+      # not app code) -- mounted read-only instead, matching how the
+      # Airflow containers below mount ./src:ro.
+      - ./scripts:/app/scripts:ro
 
   # --- 4. Airflow metadata DB -- deliberately separate from postgres-db
   # above. Airflow's own migrations/restarts shouldn't touch the app's
