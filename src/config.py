@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str
     POSTGRES_HOST: str = "postgres-db"  # Docker Compose service name
+    # Free-tier managed Postgres (Neon, Supabase, ...) rejects unencrypted
+    # connections -- local Docker Postgres has no TLS cert to offer, so the
+    # default has to stay "disable" or local dev breaks. Override to
+    # "require" for those.
+    POSTGRES_SSLMODE: str = "disable"
 
     # --- Qdrant ---
     # QDRANT_HOST is either a bare hostname (self-hosted, e.g. the Docker
@@ -83,7 +88,7 @@ class Settings(BaseSettings):
             )
         return (
             f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            f"@{self.POSTGRES_HOST}/{self.POSTGRES_DB}?sslmode=disable"
+            f"@{self.POSTGRES_HOST}/{self.POSTGRES_DB}?sslmode={self.POSTGRES_SSLMODE}"
         )
 
 
