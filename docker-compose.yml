@@ -4,8 +4,11 @@ services:
     image: postgres:15-alpine
     container_name: postgres-db
     restart: always
-    ports:
-      - "5432:5432"
+    # Not published to the host (fix-list 2.7) -- only other containers on
+    # this Compose network need to reach it; `expose` documents the port
+    # without binding it to the host interface the way `ports` does.
+    expose:
+      - "5432"
     env_file:
       - .env
     volumes:
@@ -27,41 +30,73 @@ services:
     image: qdrant/qdrant:latest
     container_name: qdrant-db
     restart: always
-    ports:
-      - "6333:6333"
-      - "6334:6334"
+    # Not published to the host -- see postgres-db above.
+    expose:
+      - "6333"
+      - "6334"
     volumes:
       - qdrant_data:/qdrant/storage
     # (Qdrant also has a healthcheck, but we don't need it yet)
 
-  # --- 3. The (Single) Application ---
-  # --- 3. The (Single) Application ---
-  app:
+  # --- 3. The API (FastAPI backend) ---
+  # One process per container (fix-list 2.1): previously run.sh backgrounded
+  # uvicorn and foregrounded Streamlit in a single container, so a dead
+  # backend didn't stop the container from looking "up". api and ui are now
+  # independent services with their own healthchecks -- see src/Dockerfile.api
+  # and src/Dockerfile.ui.
+  api:
     build:
-      context: .              # <-- CHANGE THIS
-      dockerfile: src/Dockerfile  # <-- ADD THIS
-    container_name: app
+      context: .
+      dockerfile: src/Dockerfile.api
+    container_name: api
     restart: always
     ports:
-      - "8501:8501" # Streamlit
-      - "8000:8000" # FastAPI
+      - "8000:8000"
     env_file:
       - .env
-    # --- THIS IS THE FIX (PART 2) ---
-    # This tells the 'app' to wait for 'postgres-db'
-    # to pass its healthcheck before starting.
     depends_on:
       postgres-db:
         condition: service_healthy
       qdrant-db:
         condition: service_started # Qdrant starts fast, this is fine
-
-    volumes:          # <-- ADD THIS SECTION
+    volumes:
       - ./data:/app/data
       # Not baked into the image (it's an occasional operational script,
       # not app code) -- mounted read-only instead, matching how the
       # Airflow containers below mount ./src:ro.
       - ./scripts:/app/scripts:ro
+    healthcheck:
+      # No curl in python:3.10-slim -- urllib is stdlib, so this needs no
+      # extra package. start_period is long because lifespan loads
+      # YOLO + EasyOCR + SentenceTransformer and builds the LangChain agent
+      # before /health can answer at all (cold start, ~20-40s).
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # --- 3b. The UI (Streamlit frontend) ---
+  ui:
+    build:
+      context: .
+      dockerfile: src/Dockerfile.ui
+    container_name: ui
+    restart: always
+    ports:
+      - "8501:8501"
+    environment:
+      API_BASE_URL: http://api:8000
+      API_KEY: ${API_KEY}
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8501/_stcore/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # --- 4. Airflow metadata DB -- deliberately separate from postgres-db
   # above. Airflow's own migrations/restarts shouldn't touch the app's
@@ -111,7 +146,7 @@ services:
       AIRFLOW_CONN_SMARTSENSE_POSTGRES: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}
       AIRFLOW_CONN_SMARTSENSE_QDRANT: http://qdrant-db:6333
       AIRFLOW_CONN_SMARTSENSE_INTERNAL_API: >-
-        {"conn_type": "http", "host": "app", "port": 8000, "extra": {"api_key": "${INTERNAL_API_KEY}"}}
+        {"conn_type": "http", "host": "api", "port": 8000, "extra": {"api_key": "${INTERNAL_API_KEY}"}}
     volumes:
       - ./data:/app/data
       - ./dags:/opt/airflow/dags

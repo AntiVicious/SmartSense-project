@@ -11,10 +11,11 @@ again by any other means) is safe: external_id is derived from row
 content, not upload time, so ingestion is idempotent regardless of how
 many times a given spreadsheet gets backfilled.
 
-Run from the app's environment (needs src.db/src.models, which pull in
-the same dependencies the API does) -- not from Airflow's lean image:
+Run from the api service's environment (needs src.db/src.models, which
+pull in the same dependencies the API does) -- not from Airflow's lean
+image:
 
-    docker compose run --rm app python scripts/backfill_ingest.py data/backfill/
+    docker compose run --rm api python scripts/backfill_ingest.py data/backfill/
 
 Usage:
     python scripts/backfill_ingest.py <directory-of-spreadsheets>

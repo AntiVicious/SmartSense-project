@@ -6,6 +6,7 @@ call after that reuses them. Nothing here touches disk or a model at
 import time.
 """
 
+import logging
 import os
 import re
 from pathlib import Path
@@ -14,6 +15,8 @@ import easyocr
 import numpy as np
 from PIL import Image
 from ultralytics import YOLO
+
+logger = logging.getLogger(__name__)
 
 FLOORPLAN_MODEL_PATH = str(Path(__file__).resolve().parent / "best_1000.pt")
 
@@ -98,29 +101,29 @@ def parse_floorplan(local_image_path: str) -> dict:
     # Lazy-load YOLO model
     if _yolo_model is None:
         if not os.path.exists(FLOORPLAN_MODEL_PATH):
-            print(f"Error: Model file not found at {FLOORPLAN_MODEL_PATH}")
+            logger.error("Model file not found at %s", FLOORPLAN_MODEL_PATH)
             return {"error": f"Model file not found: {FLOORPLAN_MODEL_PATH}"}
-        print(f"Loading floorplan model {FLOORPLAN_MODEL_PATH}...")
+        logger.info("Loading floorplan model %s...", FLOORPLAN_MODEL_PATH)
         _yolo_model = YOLO(FLOORPLAN_MODEL_PATH)
 
     model = _yolo_model
 
     # Lazy-load OCR model
     if _ocr_reader is None:
-        print("Lazy loading OCR model (EasyOCR)...")
+        logger.info("Lazy loading OCR model (EasyOCR)...")
         _ocr_reader = easyocr.Reader(["en"])
-        print("OCR model loaded.")
+        logger.info("OCR model loaded.")
 
     if not os.path.exists(local_image_path):
-        print(f"Error: Image file not found at {local_image_path}")
+        logger.error("Image file not found at %s", local_image_path)
         return {"error": f"Image file not found: {local_image_path}"}
 
-    print(f"Parsing image: {local_image_path}")
+    logger.debug("Parsing image: %s", local_image_path)
 
     try:
         img_pil = Image.open(local_image_path).convert("RGB")
     except Exception as e:
-        print(f"Error opening image {local_image_path}: {e}")
+        logger.error("Error opening image %s: %s", local_image_path, e)
         return {"error": f"Could not open image: {e}"}
 
     # Run YOLO detection
@@ -146,7 +149,7 @@ def parse_floorplan(local_image_path: str) -> dict:
                 if ocr_result_list:
                     detected_text = " ".join(ocr_result_list).lower()
                     detected_text = re.sub(r"[^a-z\s]", "", detected_text).strip()
-                    print(f"  > Detected label '{label}' -> OCR Text: '{detected_text}'")
+                    logger.debug("Detected label '%s' -> OCR text: '%s'", label, detected_text)
 
                     counts[classify_room_label(detected_text)] += 1
 

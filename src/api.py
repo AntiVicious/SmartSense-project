@@ -12,8 +12,10 @@ an ingest_jobs row; GET /ingest/{job_id} reads that row back. The
 YOLO/EasyOCR/embedding models without Airflow's own image needing torch.
 """
 
+import logging
 import os
 import tempfile
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
@@ -28,7 +30,10 @@ from .config import Settings, get_settings
 from .db import Base, get_embedder, get_engine, get_qdrant_client, get_session_factory
 from .floorplan import parse_floorplan
 from .ingest_landing import UnsupportedFileType, land_ingest_file
+from .logging_config import configure_logging
 from .models import ChatRequest, InternalEmbedRequest, InternalParseFloorplanRequest, IngestJob
+
+logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------
@@ -38,9 +43,10 @@ from .models import ChatRequest, InternalEmbedRequest, InternalParseFloorplanReq
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # This code runs ONCE, when the app starts up
-    print("FastAPI is starting up, waiting for databases...")
-
     settings = get_settings()
+    configure_logging(settings.LOG_LEVEL)
+    logger.info("FastAPI is starting up, waiting for databases...")
+
     engine = get_engine()
     qdrant_client = get_qdrant_client()
     embedder = get_embedder()
@@ -49,21 +55,21 @@ async def lifespan(app: FastAPI):
     # 1. Create Qdrant Collection (idempotent — do NOT wipe data on restart)
     existing = {c.name for c in qdrant_client.get_collections().collections}
     if settings.QDRANT_VECTOR_COLLECTION in existing:
-        print(f"Qdrant collection '{settings.QDRANT_VECTOR_COLLECTION}' already exists. Reusing.")
+        logger.info("Qdrant collection '%s' already exists. Reusing.", settings.QDRANT_VECTOR_COLLECTION)
     else:
         embedding_dim = len(embedder.embed_query("dimension probe"))
         qdrant_client.create_collection(
             collection_name=settings.QDRANT_VECTOR_COLLECTION,
             vectors_config=VectorParams(size=embedding_dim, distance=Distance.COSINE),
         )
-        print(f"Qdrant collection '{settings.QDRANT_VECTOR_COLLECTION}' created.")
+        logger.info("Qdrant collection '%s' created.", settings.QDRANT_VECTOR_COLLECTION)
 
     # 2. Create PostgreSQL Tables
     Base.metadata.create_all(bind=engine)
-    print("Tables created successfully.")
+    logger.info("Tables created successfully.")
 
     # 3. Initialize ALL database-dependent agents
-    print("Initializing agents...")
+    logger.info("Initializing agents...")
     agent_executor = build_agent_executor(
         engine=engine,
         qdrant_client=qdrant_client,
@@ -79,11 +85,11 @@ async def lifespan(app: FastAPI):
     app.state.session_factory = session_factory
     app.state.agent_executor = agent_executor
 
-    print("--- FastAPI is ready and agents are initialized! ---")
+    logger.info("FastAPI is ready and agents are initialized.")
 
     yield
 
-    print("FastAPI is shutting down.")
+    logger.info("FastAPI is shutting down.")
 
 
 # --- FastAPI App Definition ---
@@ -127,6 +133,65 @@ def verify_internal_api_key(
         raise HTTPException(status_code=401, detail="Invalid or missing internal API key")
 
 
+def verify_api_key(
+    x_api_key: str = Header(default=""),
+    settings: Settings = Depends(get_app_settings),
+):
+    """Gate for the public write/debug endpoints: POST /ingest and
+    POST /parse-floorplan-debug (fix-list 2.6). A static shared-secret
+    header is a deliberately minimal answer -- enough that this isn't an
+    open write path into the database or a free-to-abuse inference
+    endpoint once this is on a billed Cloud Run service, not a full auth
+    system this project doesn't otherwise have. The ui service holds this
+    key server-side (see src/main.py) and attaches it on the user's behalf."""
+    if not x_api_key or x_api_key != settings.API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+
+# --- Upload validation (fix-list 2.5) ---
+# Both upload endpoints used to call `await file.read()` with no size
+# limit and no content-type check -- one large upload could OOM the
+# container, and nothing stopped an arbitrary file from being handed to
+# pandas/PIL/YOLO.
+
+_ALLOWED_SPREADSHEET_CONTENT_TYPES = {
+    "",  # some browsers/clients omit it for less-common extensions
+    "text/csv",
+    "application/csv",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/octet-stream",  # generic fallback some clients send
+}
+
+
+async def _read_upload_or_413(file: UploadFile, settings: Settings) -> bytes:
+    """Reads at most max_upload_size_bytes + 1 bytes -- enough to detect
+    an oversized upload without ever buffering more than that much in
+    memory, regardless of what (or whether) Content-Length claims."""
+    max_bytes = settings.max_upload_size_bytes
+    contents = await file.read(max_bytes + 1)
+    if len(contents) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large (max {settings.MAX_UPLOAD_SIZE_MB}MB)",
+        )
+    return contents
+
+
+def _check_spreadsheet_content_type(file: UploadFile) -> None:
+    content_type = (file.content_type or "").lower()
+    if content_type not in _ALLOWED_SPREADSHEET_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail=f"Unsupported content type: {content_type or '(none)'}")
+
+
+def _check_image_content_type(file: UploadFile) -> None:
+    content_type = (file.content_type or "").lower()
+    if not content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=400, detail=f"Expected an image upload, got: {content_type or '(none)'}"
+        )
+
+
 # --- API Endpoints ---
 
 
@@ -149,16 +214,16 @@ def health_check(
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         checks["postgres"] = True
-    except Exception as e:
-        print(f"Health check: Postgres connectivity failed: {e}")
+    except Exception:
+        logger.warning("Health check: Postgres connectivity failed", exc_info=True)
         checks["postgres"] = False
         healthy = False
 
     try:
         qdrant_client.get_collections()
         checks["qdrant"] = True
-    except Exception as e:
-        print(f"Health check: Qdrant connectivity failed: {e}")
+    except Exception:
+        logger.warning("Health check: Qdrant connectivity failed", exc_info=True)
         checks["qdrant"] = False
         healthy = False
 
@@ -187,12 +252,21 @@ async def chat_endpoint(request: ChatRequest, agent_executor=Depends(get_app_age
         # Run agent
         response = await agent_executor.ainvoke({"input": request.query, "chat_history": chat_history})
         return {"status": "success", "response": response["output"]}
-    except Exception as e:
-        print(f"Agent execution error: {e}")
-        raise HTTPException(status_code=500, detail=f"Agent Error: {e}")
+    except Exception:
+        # Never return raw exception text to the client (fix-list 2.4) --
+        # it can leak internals (stack frames, connection strings, prompt
+        # content). Log the real error server-side keyed by a correlation
+        # ID and hand the client only that ID to reference when reporting
+        # the issue.
+        correlation_id = uuid.uuid4().hex[:12]
+        logger.exception("Agent execution failed [correlation_id=%s]", correlation_id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal error. Reference ID: {correlation_id}",
+        )
 
 
-@app.post("/ingest", status_code=202)
+@app.post("/ingest", status_code=202, dependencies=[Depends(verify_api_key)])
 async def ingest_properties(
     file: UploadFile = File(...),
     session_factory=Depends(get_app_session_factory),
@@ -201,7 +275,8 @@ async def ingest_properties(
     # Ingestion itself doesn't happen here anymore -- this just lands the
     # file where the Airflow poller DAG will find it and records a job row.
     # See dags/watch_ingest_landing_dag.py and dags/ingest_properties_dag.py.
-    file_contents = await file.read()
+    _check_spreadsheet_content_type(file)
+    file_contents = await _read_upload_or_413(file, settings)
     try:
         job_id = await run_in_threadpool(
             land_ingest_file,
@@ -252,9 +327,13 @@ async def internal_embed(request: InternalEmbedRequest, embedder=Depends(get_app
     return {"embedding": vector}
 
 
-@app.post("/parse-floorplan-debug")
-async def parse_floorplan_debug(file: UploadFile = File(...)):
-    contents = await file.read()
+@app.post("/parse-floorplan-debug", dependencies=[Depends(verify_api_key)])
+async def parse_floorplan_debug(
+    file: UploadFile = File(...),
+    settings: Settings = Depends(get_app_settings),
+):
+    _check_image_content_type(file)
+    contents = await _read_upload_or_413(file, settings)
 
     # Never trust the client-supplied filename as a path (path traversal) —
     # write to a generated temp path instead, and always clean it up.

@@ -45,6 +45,7 @@ from src.db import Base  # noqa: E402
 from src.models import IngestJob  # noqa: E402
 
 INTERNAL_API_KEY = "test-internal-key"
+API_KEY = "test-api-key"
 
 
 @asynccontextmanager
@@ -103,10 +104,16 @@ class FakeEmbedder:
 
 
 class FakeSettings:
-    def __init__(self, landing_dir=None):
+    def __init__(self, landing_dir=None, max_upload_size_mb=15):
         self.QDRANT_VECTOR_COLLECTION = "properties"
         self.INTERNAL_API_KEY = INTERNAL_API_KEY
+        self.API_KEY = API_KEY
         self.INGEST_LANDING_DIR = landing_dir or tempfile.mkdtemp()
+        self.MAX_UPLOAD_SIZE_MB = max_upload_size_mb
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        return self.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 
 class FakeAgentExecutor:
@@ -248,14 +255,21 @@ def test_chat_agent_not_initialized_returns_500():
         app.dependency_overrides.clear()
 
 
-def test_chat_agent_exception_returns_500_with_detail():
+def test_chat_agent_exception_does_not_leak_raw_exception_text():
+    # fix-list 2.4: the client gets a correlation ID, never the exception
+    # itself (which can carry stack frames, connection strings, prompt
+    # content, etc.) -- the real error is only ever logged server-side.
     fake_agent = FakeAgentExecutor(raise_exc=RuntimeError("groq exploded"))
     app.dependency_overrides[get_app_agent_executor] = lambda: fake_agent
     try:
         with TestClient(app) as client:
             resp = client.post("/chat", json={"query": "hi", "history": []})
         assert resp.status_code == 500
-        assert "groq exploded" in resp.json()["detail"]
+        detail = resp.json()["detail"]
+        assert "groq exploded" not in detail
+        assert detail.startswith("Internal error. Reference ID: ")
+        correlation_id = detail.removeprefix("Internal error. Reference ID: ")
+        assert len(correlation_id) == 12  # uuid4().hex[:12]
     finally:
         app.dependency_overrides.clear()
 
@@ -282,6 +296,7 @@ def test_ingest_route_lands_file_and_creates_queued_job():
                             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         )
                     },
+                    headers={"X-API-Key": API_KEY},
                 )
             assert resp.status_code == 202
             body = resp.json()
@@ -306,6 +321,9 @@ def test_ingest_route_lands_file_and_creates_queued_job():
 
 
 def test_ingest_route_rejects_unsupported_file_type():
+    # text/plain isn't in the allowed content-type set, so this is now
+    # rejected by the content-type check before it ever reaches
+    # land_ingest_file's extension check -- same 400, different reason.
     session_factory = _make_session_factory()
     landing_dir = tempfile.mkdtemp()
     try:
@@ -314,9 +332,73 @@ def test_ingest_route_rejects_unsupported_file_type():
         try:
             with TestClient(app) as client:
                 resp = client.post(
-                    "/ingest", files={"file": ("notes.txt", b"not a spreadsheet", "text/plain")}
+                    "/ingest",
+                    files={"file": ("notes.txt", b"not a spreadsheet", "text/plain")},
+                    headers={"X-API-Key": API_KEY},
                 )
             assert resp.status_code == 400
+            assert os.listdir(landing_dir) == []
+        finally:
+            app.dependency_overrides.clear()
+    finally:
+        shutil.rmtree(landing_dir, ignore_errors=True)
+
+
+def test_ingest_route_rejects_missing_api_key():
+    app.dependency_overrides[get_app_settings] = lambda: FakeSettings()
+    try:
+        with TestClient(app) as client:
+            resp = client.post(
+                "/ingest",
+                files={
+                    "file": (
+                        "props.xlsx",
+                        b"irrelevant",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
+                },
+            )
+        assert resp.status_code == 401
+
+        resp = client.post(
+            "/ingest",
+            files={
+                "file": (
+                    "props.xlsx",
+                    b"irrelevant",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            headers={"X-API-Key": "wrong-key"},
+        )
+        assert resp.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_ingest_route_rejects_oversized_upload():
+    session_factory = _make_session_factory()
+    landing_dir = tempfile.mkdtemp()
+    try:
+        app.dependency_overrides[get_app_session_factory] = lambda: session_factory
+        app.dependency_overrides[get_app_settings] = lambda: FakeSettings(
+            landing_dir=landing_dir, max_upload_size_mb=1
+        )
+        try:
+            oversized = b"x" * (2 * 1024 * 1024)  # 2MB against a 1MB limit
+            with TestClient(app) as client:
+                resp = client.post(
+                    "/ingest",
+                    files={
+                        "file": (
+                            "props.xlsx",
+                            oversized,
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        )
+                    },
+                    headers={"X-API-Key": API_KEY},
+                )
+            assert resp.status_code == 413
             assert os.listdir(landing_dir) == []
         finally:
             app.dependency_overrides.clear()
@@ -435,17 +517,20 @@ def test_parse_floorplan_debug_route_returns_parser_output():
         return {"rooms": 1, "halls": 0, "kitchens": 0, "bathrooms": 0, "other rooms": 0}
 
     api_module.parse_floorplan = fake_parse_floorplan
+    app.dependency_overrides[get_app_settings] = lambda: FakeSettings()
     try:
         with TestClient(app) as client:
             resp = client.post(
                 "/parse-floorplan-debug",
                 files={"file": ("plan.jpg", b"fake-image-bytes", "image/jpeg")},
+                headers={"X-API-Key": API_KEY},
             )
         assert resp.status_code == 200
         assert resp.json() == {"rooms": 1, "halls": 0, "kitchens": 0, "bathrooms": 0, "other rooms": 0}
         assert len(captured_paths) == 1
     finally:
         api_module.parse_floorplan = original_parse_floorplan
+        app.dependency_overrides.clear()
 
 
 CASES = [
@@ -457,9 +542,11 @@ CASES = [
     test_chat_success_returns_agent_output,
     test_chat_builds_history_as_message_pairs,
     test_chat_agent_not_initialized_returns_500,
-    test_chat_agent_exception_returns_500_with_detail,
+    test_chat_agent_exception_does_not_leak_raw_exception_text,
     test_ingest_route_lands_file_and_creates_queued_job,
     test_ingest_route_rejects_unsupported_file_type,
+    test_ingest_route_rejects_missing_api_key,
+    test_ingest_route_rejects_oversized_upload,
     test_get_ingest_job_returns_status,
     test_get_ingest_job_404_for_unknown_id,
     test_internal_parse_floorplan_rejects_missing_or_wrong_key,

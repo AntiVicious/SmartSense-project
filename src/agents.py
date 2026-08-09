@@ -6,6 +6,8 @@ AgentExecutor — it does no client construction itself, so it has no import-
 time or hidden side effects. It's called once from api.py's lifespan.
 """
 
+import logging
+
 from langchain.agents import AgentExecutor, create_sql_agent
 from langchain.agents.format_scratchpad.openai_tools import (
     format_to_openai_tool_messages,
@@ -21,6 +23,8 @@ from langchain_groq import ChatGroq
 
 from .config import Settings
 from .models import Property
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You are a specialized real-estate assistant.
 Your goal is to answer questions about properties using the tools provided.
@@ -40,9 +44,16 @@ def build_agent_executor(
 ) -> AgentExecutor:
     llm = ChatGroq(model=settings.LLM_MODEL_NAME, temperature=0, api_key=settings.GROQ_API_KEY)
 
+    # verbose=True makes LangChain print its full reasoning trace (prompts,
+    # intermediate tool calls, raw LLM output) to stdout on every request --
+    # useful while developing, a logging/cost liability left on by default in
+    # production. Tied to LOG_LEVEL rather than a separate setting: if you've
+    # turned on DEBUG logging you also want this (fix-list 2.3).
+    verbose = settings.LOG_LEVEL.upper() == "DEBUG"
+
     db = SQLDatabase(engine, include_tables=["properties"])
     sql_toolkit = SQLDatabaseToolkit(db=db, llm=llm)
-    sql_agent = create_sql_agent(llm=llm, toolkit=sql_toolkit, agent_type="openai-tools", verbose=True)
+    sql_agent = create_sql_agent(llm=llm, toolkit=sql_toolkit, agent_type="openai-tools", verbose=verbose)
     sql_search_tool = Tool(
         name="structured_property_search",
         func=sql_agent.invoke,
@@ -74,7 +85,7 @@ def build_agent_executor(
             max_price (float): The maximum price.
             min_rooms (int): The minimum number of rooms.
         """
-        print("--- Report Generation Agent Triggered ---")
+        logger.info("Report generation agent triggered")
         db = session_factory()
         try:
             # Build the query dynamically based on provided arguments
@@ -118,11 +129,11 @@ def build_agent_executor(
                 report += f"* **Bathrooms:** {bath_str}\n"
                 report += f"* **Description:** {desc_str}\n\n"
 
-            print(f"Generated report with {len(properties)} properties.")
+            logger.info("Generated report with %d properties", len(properties))
             return report
 
-        except Exception as e:
-            print(f"Error generating report: {e}")
+        except Exception:
+            logger.exception("Error generating report")
             return "Sorry, I was unable to generate the report due to an error."
         finally:
             db.close()
@@ -150,4 +161,4 @@ def build_agent_executor(
         | OpenAIToolsAgentOutputParser()
     )
 
-    return AgentExecutor(agent=main_agent, tools=tools, verbose=True)
+    return AgentExecutor(agent=main_agent, tools=tools, verbose=verbose)

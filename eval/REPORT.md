@@ -11,10 +11,10 @@ baseline's own recommendation.
 
 ```bash
 # 1. Run the real YOLO + EasyOCR pipeline over the held-out split, write a
-#    labeling worksheet (needs the app image: torch/ultralytics/easyocr)
+#    labeling worksheet (needs the api image: torch/ultralytics/easyocr)
 docker run --rm \
   -v "$(pwd)/scripts:/app/scripts:ro" -v "$(pwd)/eval:/app/eval" -w /app \
-  smartsense-project-app:latest python scripts/eval_floorplan_classifier.py extract \
+  smartsense-project-api:latest python scripts/eval_floorplan_classifier.py extract \
     --images-dir /app/data/images --out /app/eval --eval-fraction 0.2 --seed 42
 
 # 2. Hand-label eval/detections.csv's ground_truth_class column (already
@@ -259,10 +259,10 @@ until you decide," per the original brief.
 ## Reproduce the post-fix numbers
 
 ```bash
-docker compose build app   # picks up prepare_ocr_crop
+docker compose build api   # picks up prepare_ocr_crop
 docker run --rm \
   -v "$(pwd)/scripts:/app/scripts:ro" -v "$(pwd)/eval:/app/eval" -w /app \
-  smartsense-project-app:latest python scripts/eval_floorplan_classifier.py extract \
+  smartsense-project-api:latest python scripts/eval_floorplan_classifier.py extract \
     --images-dir /app/data/images --out /app/eval --eval-fraction 0.2 --seed 42
 python scripts/eval_floorplan_classifier.py score --detections eval/detections.csv --out eval/REPORT.md
 ```

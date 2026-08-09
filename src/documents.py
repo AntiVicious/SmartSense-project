@@ -1,15 +1,24 @@
-"""PDF text extraction: local certificate files and remote URLs."""
+"""PDF text extraction: local certificate files and remote URLs.
 
+Currently unreferenced: dags/ingest_properties_dag.py's
+extract_certificate_text task does its own inline PyMuPDF extraction
+rather than calling either function here (a leftover from before the
+Airflow migration). Flagging rather than deleting -- out of scope for
+the change that found it."""
+
+import logging
 import os
 
 import fitz
 import requests
 
+logger = logging.getLogger(__name__)
+
 
 def parse_local_pdf(local_pdf_path: str) -> str:
     """Opens a local PDF file and extracts all text."""
     if not local_pdf_path or not os.path.exists(local_pdf_path):
-        print(f"Warning: PDF file not found at {local_pdf_path}")
+        logger.warning("PDF file not found at %s", local_pdf_path)
         return ""
 
     try:
@@ -18,11 +27,11 @@ def parse_local_pdf(local_pdf_path: str) -> str:
             for page in doc:
                 pdf_text += page.get_text()
 
-        print(f"Successfully parsed {len(pdf_text)} chars from {os.path.basename(local_pdf_path)}")
+        logger.debug("Parsed %d chars from %s", len(pdf_text), os.path.basename(local_pdf_path))
         return pdf_text
 
-    except Exception as e:
-        print(f"Warning: Could not parse PDF {local_pdf_path}. Error: {e}")
+    except Exception:
+        logger.warning("Could not parse PDF %s", local_pdf_path, exc_info=True)
         return ""  # Return empty string on failure
 
 
@@ -32,7 +41,7 @@ def fetch_and_parse_pdf(pdf_url: str) -> str:
         return ""  # Return empty string if no valid PDF URL
 
     try:
-        print(f"Fetching PDF from: {pdf_url}")
+        logger.debug("Fetching PDF from: %s", pdf_url)
         response = requests.get(pdf_url, timeout=10)  # 10 sec timeout
         response.raise_for_status()  # Raise error if bad response (404, 500)
 
@@ -42,9 +51,9 @@ def fetch_and_parse_pdf(pdf_url: str) -> str:
             for page in doc:
                 pdf_text += page.get_text()
 
-        print(f"Successfully parsed {len(pdf_text)} chars from {pdf_url}")
+        logger.debug("Parsed %d chars from %s", len(pdf_text), pdf_url)
         return pdf_text
 
-    except Exception as e:
-        print(f"Warning: Could not parse PDF from {pdf_url}. Error: {e}")
+    except Exception:
+        logger.warning("Could not parse PDF from %s", pdf_url, exc_info=True)
         return ""  # Return empty string on failure

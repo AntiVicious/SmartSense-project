@@ -42,7 +42,11 @@ def get_session_factory():
 @lru_cache
 def get_qdrant_client() -> QdrantClient:
     settings = get_settings()
-    return QdrantClient(host=settings.QDRANT_HOST, port=6333)
+    if settings.QDRANT_HOST.startswith("http://") or settings.QDRANT_HOST.startswith("https://"):
+        # Qdrant Cloud (or any URL-addressed instance) -- QDRANT_HOST carries
+        # the scheme, e.g. https://xyz.cloud.qdrant.io, not just a hostname.
+        return QdrantClient(url=settings.QDRANT_HOST, api_key=settings.QDRANT_API_KEY)
+    return QdrantClient(host=settings.QDRANT_HOST, port=6333, api_key=settings.QDRANT_API_KEY)
 
 
 @lru_cache

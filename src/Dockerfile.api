@@ -35,9 +35,8 @@ RUN python -c "import urllib.request; urllib.request.urlretrieve('${MODEL_WEIGHT
 # --- 5. Copy the Data ---
 COPY data /app/data
 
-# --- 6. FIX line endings & make executable ---
-RUN sed -i 's/\r$//' ./src/run.sh
-RUN chmod +x ./src/run.sh
-
-# --- 7. Run the App ---
-CMD ["./src/run.sh"]
+# --- 6. Run the API ---
+# One process per container (fix-list 2.1) -- this image no longer runs
+# Streamlit at all (see src/Dockerfile.ui), so there's nothing for a dead
+# uvicorn to hide behind: if this process dies, the container dies.
+CMD ["python", "-m", "uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]

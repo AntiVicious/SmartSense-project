@@ -1,3 +1,4 @@
+import os
 import time
 
 import streamlit as st
@@ -7,8 +8,17 @@ import requests
 st.set_page_config(page_title="Real Estate Search", layout="wide")
 st.title("SmartSense Real Estate Search 🏠")
 
-# We now connect to localhost:8000, because FastAPI is in the same container
-BACKEND_URL = "http://localhost:8000"
+# api and ui are now separate containers/services (fix-list 2.1) -- "localhost"
+# only worked back when uvicorn and Streamlit shared one container. Defaults
+# to the Docker Compose service name; Cloud Run deployment overrides this to
+# the api service's URL.
+BACKEND_URL = os.environ.get("API_BASE_URL", "http://api:8000")
+
+# Sent as X-API-Key on the write/debug endpoints (POST /ingest and
+# POST /parse-floorplan-debug) -- the api service rejects those without it.
+# The UI is a server-side process, so it can hold this secret safely; it's
+# never sent to the end user's browser.
+API_KEY = os.environ.get("API_KEY", "")
 
 # How long to wait for the backend to come up before declaring it dead.
 # The FastAPI lifespan loads YOLO + EasyOCR + SentenceTransformer + builds
@@ -86,10 +96,14 @@ if st.button("Start Ingestion"):
     if uploaded_file is not None:
         files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
         try:
-            with st.spinner("Ingesting data... This may take a moment."):
-                response = requests.post(f"{BACKEND_URL}/ingest", files=files)
-            if response.status_code == 200:
-                st.success(response.json()["message"])
+            with st.spinner("Uploading..."):
+                response = requests.post(f"{BACKEND_URL}/ingest", files=files, headers={"X-API-Key": API_KEY})
+            # /ingest enqueues rather than ingesting inline -- it returns 202
+            # with a job_id, not 200 with a "message" (Airflow does the
+            # actual work; see GET /ingest/{job_id} to poll status).
+            if response.status_code == 202:
+                body = response.json()
+                st.success(f"Queued as job {body['job_id']}. Poll {body['status_url']} for status.")
             else:
                 st.error(f"Error: {response.json()['detail']}")
         except requests.exceptions.ConnectionError:
@@ -111,7 +125,9 @@ if st.button("Parse Floorplan"):
         files = {"file": (uploaded_image.name, uploaded_image.getvalue(), uploaded_image.type)}
         try:
             with st.spinner("Parsing image..."):
-                response = requests.post(f"{BACKEND_URL}/parse-floorplan-debug", files=files)
+                response = requests.post(
+                    f"{BACKEND_URL}/parse-floorplan-debug", files=files, headers={"X-API-Key": API_KEY}
+                )
 
             if response.status_code == 200:
                 st.success("Image parsed successfully!")

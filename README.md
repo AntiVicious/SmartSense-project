@@ -19,7 +19,9 @@ about the resulting portfolio through a multi-agent chatbot.
 - **Multi-agent chat**: a LangChain tool-calling agent routes each question
   to a SQL agent (structured queries), a RAG chain over Qdrant (semantic
   search), or a custom report generator.
-- **FastAPI + Streamlit**, containerized with Docker Compose.
+- **FastAPI + Streamlit**, each its own container/Cloud Run service (`api`
+  and `ui`) with an independent healthcheck — see [Deploying to Cloud
+  Run](DEPLOY.md).
 
 Built with: Python 3.10 · FastAPI · Streamlit · PostgreSQL · Qdrant · Airflow
 · YOLOv8 (Ultralytics) · EasyOCR · LangChain · Groq
@@ -55,6 +57,11 @@ POSTGRES_DB=real_estate_db
 # Shared secret between the app and Airflow -- see Ingestion Pipeline below
 INTERNAL_API_KEY=some-long-random-string
 
+# Gates POST /ingest and POST /parse-floorplan-debug -- the ui service
+# holds this and attaches it on your behalf, so you only need it yourself
+# for calling those endpoints directly. Generate like INTERNAL_API_KEY.
+API_KEY=some-other-long-random-string
+
 # Airflow's own metadata DB -- a separate Postgres instance from the one
 # above, not a second logical DB in it (see Ingestion Pipeline below)
 AIRFLOW_POSTGRES_USER=airflow
@@ -82,9 +89,12 @@ docker compose up --build
 
 First build takes 30–45 minutes (PyTorch, Ultralytics, EasyOCR, etc.); the
 heavy dependency layer is cached separately from application code, so
-subsequent rebuilds after a code change take 1–2 minutes. The Airflow image
-is a separate, much lighter build (no PyTorch/LangChain — see [Ingestion
-Pipeline](#ingestion-pipeline-airflow) below).
+subsequent rebuilds after a code change take 1–2 minutes. `api` and `ui`
+are separate images (`src/Dockerfile.api` / `src/Dockerfile.ui`) — `ui`
+only needs Streamlit + `requests` (~760MB built, vs. `api`'s ~10GB), since
+it talks to `api` over HTTP and never imports torch/langchain itself. The
+Airflow image is also separate and lighter (no PyTorch/LangChain — see
+[Ingestion Pipeline](#ingestion-pipeline-airflow) below).
 
 - **UI:** http://localhost:8501
 - **API docs:** http://localhost:8000/docs
@@ -101,10 +111,10 @@ Pipeline](#ingestion-pipeline-airflow) below).
 | `/` | GET | Trivial liveness ping |
 | `/health` | GET | Checks Postgres, Qdrant, and agent initialization; 503 if any fail |
 | `/chat` | POST | `{"query": str, "history": [[user, assistant], ...]}` → agent response |
-| `/ingest` | POST | Upload an Excel/CSV file; lands it and enqueues an Airflow ingestion run — see below |
+| `/ingest` | POST | **Requires `X-API-Key`.** Upload an Excel/CSV file (max 15MB, spreadsheet content-types only); lands it and enqueues an Airflow ingestion run — see below |
 | `/ingest/{job_id}` | GET | Poll the status of a submitted ingestion job (`queued` / `running` / `succeeded` / `failed`) |
-| `/parse-floorplan-debug` | POST | Upload a single floorplan image, get back the room-count JSON |
-| `/internal/parse-floorplan`, `/internal/embed` | POST | Called by the Airflow DAG only (shared-secret header); not for external use |
+| `/parse-floorplan-debug` | POST | **Requires `X-API-Key`.** Upload a single floorplan image (max 15MB, `image/*` only), get back the room-count JSON |
+| `/internal/parse-floorplan`, `/internal/embed` | POST | Called by the Airflow DAG only (`X-Internal-Api-Key`, a separate secret from `X-API-Key`); not for external use |
 
 ---
 
@@ -115,6 +125,7 @@ SmartSense-project/
 ├── src/
 │   ├── api.py                # FastAPI app: routes + lifespan wiring only
 │   ├── config.py             # pydantic-settings Settings (fails loudly on missing env vars)
+│   ├── logging_config.py      # structured (JSON) logging setup -- Cloud Logging severity support
 │   ├── db.py                  # lazy engine/Qdrant-client/embedder factories
 │   ├── models.py              # SQLAlchemy Property + IngestJob models, request schemas
 │   ├── floorplan.py           # YOLO + EasyOCR floorplan parsing, room classification
@@ -123,9 +134,9 @@ SmartSense-project/
 │   ├── ingest_landing.py      # POST /ingest's file-landing + ingest_jobs row creation
 │   ├── ingest_support.py      # external_id / Qdrant point-id derivation (shared with Airflow)
 │   ├── data_quality.py        # pandas DQ checks (shared with Airflow)
-│   ├── main.py                # Streamlit UI
-│   ├── Dockerfile             # fetches best_1000.pt from a GitHub release at build time
-│   └── run.sh                 # launches FastAPI + Streamlit in one container
+│   ├── main.py                # Streamlit UI (talks to api over HTTP only)
+│   ├── Dockerfile.api         # FastAPI image -- fetches best_1000.pt at build time
+│   └── Dockerfile.ui          # Streamlit image -- lean, no heavy deps
 │
 ├── dags/                      # Airflow DAGs -- see Ingestion Pipeline below
 │   ├── support.py             # Connections-based Postgres/Qdrant/internal-API helpers
@@ -147,8 +158,10 @@ SmartSense-project/
 │
 ├── .github/workflows/ci.yml  # lint + test on push to main
 ├── docker-compose.yml
-├── requirements.txt           # light deps (fastapi, langchain, ...)
-├── requirements-heavy.txt     # heavy deps (torch, ultralytics, easyocr, ...)
+├── DEPLOY.md                  # Cloud Run deployment steps + cost estimate
+├── requirements.txt           # api's light deps (fastapi, langchain, ...)
+├── requirements-heavy.txt     # api's heavy deps (torch, ultralytics, easyocr, ...)
+├── requirements-ui.txt        # ui's only deps: streamlit, requests
 └── requirements-dev.txt       # black, flake8, pytest
 ```
 
@@ -156,13 +169,13 @@ SmartSense-project/
 
 ## Design Notes
 
-**Single container, dual process.** Separate frontend/backend containers hit
-unreliable Docker networking during early development ("Connection
-Refused", "Host not found"). `run.sh` backgrounds the FastAPI server and
-runs Streamlit in the foreground of the same container, so the UI talks to
-the API over `localhost` like a local process. The tradeoff — if uvicorn
-crashes, the container looks alive because Streamlit still is — is a known
-issue tracked for a future split into two Compose services.
+**One process per container.** Early on, `run.sh` backgrounded uvicorn and
+ran Streamlit in the foreground of one container, so a dead backend didn't
+stop the container from looking "up" — Streamlit was still alive. `api`
+and `ui` are now separate Compose services (`src/Dockerfile.api` /
+`src/Dockerfile.ui`), each with its own healthcheck; `ui` talks to `api`
+over the Compose network via `API_BASE_URL` (defaults to `http://api:8000`)
+instead of `localhost`.
 
 **Startup ordering.** The `app` container previously raced `postgres-db` and
 crashed with `Connection refused`. Fixed with a Postgres healthcheck plus a
@@ -181,6 +194,61 @@ without a network connection, a model download, or a live database.
 the ~30 minute part) is installed in its own Docker layer, separate from
 `requirements.txt` and the application code. Changing `api.py` or a light
 dependency triggers a 1–2 minute rebuild, not a 30-minute one.
+
+---
+
+## Hardening
+
+Fixes made specifically to get this to a state worth deploying publicly:
+
+**Structured logging, not `print()`.** Every module logs through
+`logging.getLogger(__name__)`; `src/logging_config.py` installs a handler
+that emits one JSON line per record with a `severity` key — Cloud Logging's
+convention for inferring log level from stdout/stderr, which it can't do
+from bare text. `LOG_LEVEL` (`Settings`, default `INFO`) controls the
+threshold everywhere, including `httpx`/`httpcore`/`urllib3`, which are
+capped at `WARNING` regardless (otherwise their per-request chatter drowns
+out everything else at `DEBUG`). LangChain's `verbose=True` on the SQL
+agent and `AgentExecutor` — previously unconditional, so every request
+dumped its full reasoning trace to stdout — is now tied to the same knob
+(`LOG_LEVEL=DEBUG`), off by default.
+
+**No raw exception text over HTTP.** `/chat`'s error handler used to return
+`f"Agent Error: {e}"` directly to the client — a real leak vector (stack
+frames, connection strings, prompt content). It now logs the real
+exception server-side against a correlation ID and returns only
+`"Internal error. Reference ID: <id>"`; grep the id in `api`'s logs to find
+what actually happened.
+
+**Upload validation.** Both `POST /ingest` and `POST /parse-floorplan-debug`
+used to call `await file.read()` with no limit — one large upload could
+OOM the container. Both now check content-type first (spreadsheet
+MIME-types for `/ingest`, `image/*` for `/parse-floorplan-debug`, `400` if
+not), then read at most `MAX_UPLOAD_SIZE_MB` (`Settings`, default 15) + 1
+bytes — enough to detect an oversized upload (`413`) without ever
+buffering more than that in memory, regardless of what `Content-Length`
+claims or omits.
+
+**API key on the write/debug endpoints.** `POST /ingest` was an
+unauthenticated public write path into the database; `POST
+/parse-floorplan-debug` was free, unauthenticated compute (real YOLO +
+EasyOCR inference) — a direct cost-abuse vector once this is billed
+per-request on Cloud Run. Both now require `X-API-Key` matching
+`Settings.API_KEY`, checked before either endpoint does any work. The `ui`
+service holds this key server-side and attaches it on the user's behalf
+(see `src/main.py`) — it's never sent to the end user's browser.
+`/chat` and the rest of the UI stay open: the point of the public demo is
+that people can actually use it without credentials; only the paths that
+write to the database or run free-standing inference are gated. `/internal/*`
+keeps its own, separate `X-Internal-Api-Key` (Airflow only).
+
+**Database ports not published to the host.** `postgres-db` and
+`qdrant-db` used `ports:` (bound to the host on every interface) with
+`restart: always` and the credentials from `.env.example`. Both now use
+`expose:` instead — reachable from other containers on the Compose
+network, not from the host or (once deployed) the internet. `docker exec
+postgres-db psql ...` still works for local debugging; a client on your
+host connecting to `localhost:5432` no longer does.
 
 ---
 
@@ -250,7 +318,7 @@ DAG if not.
 **Backfill.**
 
 ```bash
-docker compose run --rm app python scripts/backfill_ingest.py data/backfill/
+docker compose run --rm api python scripts/backfill_ingest.py data/backfill/
 ```
 
 Lands every spreadsheet in the given directory exactly the way `POST

@@ -27,7 +27,11 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str = "postgres-db"  # Docker Compose service name
 
     # --- Qdrant ---
-    QDRANT_HOST: str = "qdrant-db"  # Docker Compose service name
+    # QDRANT_HOST is either a bare hostname (self-hosted, e.g. the Docker
+    # Compose service name) or a full URL including scheme (Qdrant Cloud,
+    # e.g. https://xyz.cloud.qdrant.io) -- see db.py's get_qdrant_client().
+    QDRANT_HOST: str = "qdrant-db"
+    QDRANT_API_KEY: str | None = None  # required for Qdrant Cloud, unused self-hosted
     QDRANT_VECTOR_COLLECTION: str = "properties"
 
     # --- Groq / LLM ---
@@ -46,8 +50,37 @@ class Settings(BaseSettings):
     # --- Ingest landing directory (file-drop trigger for the Airflow DAGs) ---
     INGEST_LANDING_DIR: str = "/app/data/_incoming"
 
+    # --- Logging (fix-list 2.3) ---
+    LOG_LEVEL: str = "INFO"
+
+    # --- API key for public write/debug endpoints: POST /ingest and
+    # POST /parse-floorplan-debug (fix-list 2.6). Distinct from
+    # INTERNAL_API_KEY -- that one is Airflow-only; this one is held by the
+    # ui service (see src/main.py) and, if you're calling these endpoints
+    # directly, whoever else you hand it to. Required, no default, same
+    # fail-loudly reasoning as INTERNAL_API_KEY.
+    API_KEY: str
+
+    # --- Upload validation (fix-list 2.5) ---
+    MAX_UPLOAD_SIZE_MB: int = 15
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        return self.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
     @property
     def database_url(self) -> str:
+        # Cloud SQL's Auth Proxy (or Cloud Run's built-in Cloud SQL
+        # connection) exposes the database over a Unix socket at
+        # /cloudsql/<INSTANCE_CONNECTION_NAME> instead of a host:port --
+        # detected here by POSTGRES_HOST starting with "/", since that's
+        # never a valid hostname. psycopg2's URL form for a socket
+        # directory takes the host as a query param, not before the "/".
+        if self.POSTGRES_HOST.startswith("/"):
+            return (
+                f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@/{self.POSTGRES_DB}?host={self.POSTGRES_HOST}"
+            )
         return (
             f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}/{self.POSTGRES_DB}?sslmode=disable"

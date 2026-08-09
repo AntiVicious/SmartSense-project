@@ -28,7 +28,10 @@ if _REPO_ROOT not in sys.path:
 from fastapi.testclient import TestClient  # noqa: E402
 
 import src.api as api_module  # noqa: E402
-from src.api import app  # noqa: E402
+from src.api import app, get_app_settings  # noqa: E402
+
+API_KEY = "test-api-key"
+AUTH_HEADER = {"X-API-Key": API_KEY}
 
 
 @asynccontextmanager
@@ -37,6 +40,22 @@ async def _noop_lifespan(_app):
 
 
 app.router.lifespan_context = _noop_lifespan
+
+
+class FakeSettings:
+    def __init__(self, max_upload_size_mb=15):
+        self.API_KEY = API_KEY
+        self.MAX_UPLOAD_SIZE_MB = max_upload_size_mb
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        return self.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+
+# Every test in this file hits /parse-floorplan-debug, which now depends on
+# get_app_settings (for the API key check and the upload size limit) --
+# override it once, module-wide, rather than per test.
+app.dependency_overrides[get_app_settings] = lambda: FakeSettings()
 
 
 def test_malicious_filename_never_reaches_the_filesystem_path():
@@ -58,6 +77,7 @@ def test_malicious_filename_never_reaches_the_filesystem_path():
             resp = client.post(
                 "/parse-floorplan-debug",
                 files={"file": (malicious_filename, b"not a real image", "image/jpeg")},
+                headers=AUTH_HEADER,
             )
         assert resp.status_code == 200
         actual_path = captured["path"]
@@ -95,6 +115,7 @@ def test_filename_with_null_byte_and_path_separators_never_reaches_the_path():
             resp = client.post(
                 "/parse-floorplan-debug",
                 files={"file": (malicious_filename, b"not a real image", "image/jpeg")},
+                headers=AUTH_HEADER,
             )
         assert resp.status_code == 200
         actual_path = captured["path"]
@@ -126,6 +147,7 @@ def test_temp_file_is_cleaned_up_even_if_parsing_fails():
             resp = client.post(
                 "/parse-floorplan-debug",
                 files={"file": ("plan.jpg", b"not a real image", "image/jpeg")},
+                headers=AUTH_HEADER,
             )
         assert resp.status_code == 500
         assert "path" in captured
@@ -134,10 +156,47 @@ def test_temp_file_is_cleaned_up_even_if_parsing_fails():
         api_module.parse_floorplan = original_parse_floorplan
 
 
+def test_missing_api_key_is_rejected():
+    with TestClient(app) as client:
+        resp = client.post(
+            "/parse-floorplan-debug",
+            files={"file": ("plan.jpg", b"not a real image", "image/jpeg")},
+        )
+    assert resp.status_code == 401
+
+
+def test_non_image_content_type_is_rejected():
+    with TestClient(app) as client:
+        resp = client.post(
+            "/parse-floorplan-debug",
+            files={"file": ("plan.pdf", b"%PDF-1.4 not really", "application/pdf")},
+            headers=AUTH_HEADER,
+        )
+    assert resp.status_code == 400
+
+
+def test_oversized_upload_is_rejected():
+    app.dependency_overrides[get_app_settings] = lambda: FakeSettings(max_upload_size_mb=1)
+    try:
+        oversized = b"x" * (2 * 1024 * 1024)  # 2MB against a 1MB limit
+        with TestClient(app) as client:
+            resp = client.post(
+                "/parse-floorplan-debug",
+                files={"file": ("plan.jpg", oversized, "image/jpeg")},
+                headers=AUTH_HEADER,
+            )
+        assert resp.status_code == 413
+    finally:
+        app.dependency_overrides[get_app_settings] = lambda: FakeSettings()
+
+
 CASES = [
     test_malicious_filename_never_reaches_the_filesystem_path,
     test_filename_with_null_byte_and_path_separators_never_reaches_the_path,
     test_temp_file_is_cleaned_up_even_if_parsing_fails,
+    test_missing_api_key_is_rejected,
+    test_non_image_content_type_is_rejected,
+    test_oversized_upload_is_rejected,
 ]
 
 
