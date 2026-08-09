@@ -27,6 +27,7 @@ class Property(Base):
     halls = Column(Integer)
     kitchens = Column(Integer)
     bathrooms = Column(Integer)
+    other_rooms = Column(Integer)
 
 
 class IngestJob(Base):

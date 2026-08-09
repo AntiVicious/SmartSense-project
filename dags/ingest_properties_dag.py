@@ -236,6 +236,7 @@ def ingest_properties():
             row["halls"] = floorplan_data.get("halls")
             row["kitchens"] = floorplan_data.get("kitchens")
             row["bathrooms"] = floorplan_data.get("bathrooms")
+            row["other_rooms"] = floorplan_data.get("other rooms")
 
             listing_id = row.get("listing_id")
             if listing_id and not pd.isna(listing_id):
@@ -334,6 +335,7 @@ def ingest_properties():
                     "halls": row.get("halls"),
                     "kitchens": row.get("kitchens"),
                     "bathrooms": row.get("bathrooms"),
+                    "other_rooms": row.get("other_rooms"),
                 }
                 stmt = pg_insert(properties).values(**values)
                 stmt = stmt.on_conflict_do_update(
