@@ -1,0 +1,11 @@
+image,box_index,crop_file,raw_ocr_text,cleaned_text,predicted_class,ground_truth_class
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,18,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box18.jpg,,,others,unreadable
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,20,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box20.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,10,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box10.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,15,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box15.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,16,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box16.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,18,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box18.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,22,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box22.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,23,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box23.jpg,,,others,unreadable
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,24,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box24.jpg,,,others,unreadable
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,30,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box30.jpg,,,others,unreadable

@@ -1,0 +1,273 @@
+image,box_index,crop_file,raw_ocr_text,cleaned_text,predicted_class,ground_truth_class
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,0,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box0.jpg,FeON PCRCH,feon pcrch,others,others
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,1,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box1.jpg,B3 7,b,others,rooms
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,2,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box2.jpg,,,others,others
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,3,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box3.jpg,,,others,rooms
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,4,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box4.jpg,CO/ED FORC -,coed forc,others,others
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,5,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box5.jpg,COVERED FOECA,covered foeca,others,others
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,6,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box6.jpg,,,others,others
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,7,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box7.jpg,KTcHEY,ktchey,others,kitchens
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,8,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box8.jpg,6obir6L,obirl,others,halls
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,9,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box9.jpg,EED %,eed,others,rooms
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,10,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box10.jpg,,,others,others
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,11,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box11.jpg,G1,g,others,others
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,12,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box12.jpg,@2,,others,others
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,13,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box13.jpg,,,others,others
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,14,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box14.jpg,,,others,bathrooms
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,15,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box15.jpg,,,others,others
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,16,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box16.jpg,,,others,bathrooms
+0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135.jpg,17,0_9_jpg.rf.9b19978eb570a6c50a18645c1a42c135_box17.jpg,,,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,0,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box0.jpg,,,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,1,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box1.jpg,KTCHE',ktche,others,kitchens
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,2,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box2.jpg,FOwR,fowr,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,3,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box3.jpg,JGuK,jguk,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,4,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box4.jpg,C#AIROCM,cairocm,others,halls
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,5,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box5.jpg,,,others,bathrooms
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,6,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box6.jpg,FRONT RoRCT,front rorct,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,7,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box7.jpg,REAR ForCH,rear forch,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,8,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box8.jpg,,,others,rooms
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,9,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box9.jpg,,,others,rooms
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,10,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box10.jpg,1 C4R Garace,cr garace,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,11,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box11.jpg,M CICSET,m cicset,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,12,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box12.jpg,bed #,bed,rooms,rooms
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,13,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box13.jpg,Wnc?,wnc,others,bathrooms
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,14,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box14.jpg,,,others,rooms
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,15,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box15.jpg,,,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,16,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box16.jpg,,,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,17,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box17.jpg,CoES /,coes,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,18,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box18.jpg,,,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,19,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box19.jpg,,,others,bathrooms
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,20,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box20.jpg,,,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,21,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box21.jpg,,,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,22,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box22.jpg,,,others,others
+10_8_jpg.rf.a3055316892acf626e4a91cb35620962.jpg,23,10_8_jpg.rf.a3055316892acf626e4a91cb35620962_box23.jpg,,,others,others
+13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746.jpg,0,13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746_box0.jpg,Kitchen,kitchen,kitchens,kitchens
+13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746.jpg,1,13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746_box1.jpg,Bedroom,bedroom,rooms,rooms
+13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746.jpg,2,13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746_box2.jpg,Bonus Room,bonus room,rooms,rooms
+13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746.jpg,3,13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746_box3.jpg,Living Room,living room,halls,halls
+13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746.jpg,4,13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746_box4.jpg,Covered Or Screened Porch,covered or screened porch,others,others
+13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746.jpg,5,13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746_box5.jpg,Rear Porch,rear porch,others,others
+13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746.jpg,6,13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746_box6.jpg,Front Porch,front porch,others,others
+13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746.jpg,7,13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746_box7.jpg,TubiShwr:,tubishwr,others,bathrooms
+13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746.jpg,8,13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746_box8.jpg,X 1 4,x,others,others
+13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746.jpg,9,13_15_jpg.rf.349f66822e3a1d6b2bdfd80cea376746_box9.jpg,2,,others,others
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,0,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box0.jpg,,,others,others
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,1,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box1.jpg,,,others,bathrooms
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,2,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box2.jpg,DNG,dng,others,others
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,3,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box3.jpg,Po ~DER,po der,others,bathrooms
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,4,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box4.jpg,Bhofaa,bhofaa,others,rooms
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,5,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box5.jpg,,,others,others
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,6,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box6.jpg,,,others,kitchens
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,7,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box7.jpg,SNCLE CAR CARACE,sncle car carace,others,others
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,8,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box8.jpg,,,others,halls
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,9,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box9.jpg,CD ERE FnnCX,cd ere fnncx,others,others
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,10,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box10.jpg,REAR COVERED,rear covered,others,others
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,11,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box11.jpg,,,others,others
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,12,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box12.jpg,{IACKARI,iackari,others,others
+13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729.jpg,13,13_24_jpg.rf.0c0eb33de1638988acb7ad3a33da9729_box13.jpg,,,others,others
+13_4_jpg.rf.d4c6135374dd29046aa3243b41d8603f.jpg,0,13_4_jpg.rf.d4c6135374dd29046aa3243b41d8603f_box0.jpg,LIVING ROOM,living room,halls,halls
+13_4_jpg.rf.d4c6135374dd29046aa3243b41d8603f.jpg,1,13_4_jpg.rf.d4c6135374dd29046aa3243b41d8603f_box1.jpg,DECK,deck,others,others
+13_4_jpg.rf.d4c6135374dd29046aa3243b41d8603f.jpg,2,13_4_jpg.rf.d4c6135374dd29046aa3243b41d8603f_box2.jpg,BEDROOM,bedroom,rooms,rooms
+13_4_jpg.rf.d4c6135374dd29046aa3243b41d8603f.jpg,3,13_4_jpg.rf.d4c6135374dd29046aa3243b41d8603f_box3.jpg,KITCHEN,kitchen,kitchens,kitchens
+13_4_jpg.rf.d4c6135374dd29046aa3243b41d8603f.jpg,4,13_4_jpg.rf.d4c6135374dd29046aa3243b41d8603f_box4.jpg,MUEROOM,mueroom,rooms,others
+13_4_jpg.rf.d4c6135374dd29046aa3243b41d8603f.jpg,5,13_4_jpg.rf.d4c6135374dd29046aa3243b41d8603f_box5.jpg,BATH,bath,bathrooms,bathrooms
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,0,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box0.jpg,DINIRG,dinirg,others,others
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,1,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box1.jpg,MBATA,mbata,others,bathrooms
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,2,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box2.jpg,REAR PORCH,rear porch,others,others
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,3,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box3.jpg,FOYER,foyer,others,others
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,4,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box4.jpg,KIQEN,kiqen,kitchens,kitchens
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,5,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box5.jpg,WRAP _ ROUND PORCH,wrap  round porch,others,others
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,6,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box6.jpg,,,others,others
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,7,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box7.jpg,"BEDRCOY ""2",bedrcoy,rooms,rooms
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,8,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box8.jpg,BEDROOK #,bedrook,rooms,rooms
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,9,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box9.jpg,,,others,others
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,10,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box10.jpg,MASTER FEDROOM,master fedroom,rooms,rooms
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,11,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box11.jpg,GARAGE ZCAR,garage zcar,others,others
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,12,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box12.jpg,,,others,others
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,13,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box13.jpg,LIVING ROON,living roon,halls,halls
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,14,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box14.jpg,BATH #2,bath,bathrooms,bathrooms
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,15,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box15.jpg,KUD RCOY,kud rcoy,others,others
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,16,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box16.jpg,,,others,others
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,17,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box17.jpg,,,others,others
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,19,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box19.jpg,,,others,others
+15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb.jpg,20,15_2_jpg.rf.086f0fd16252a0081a8c985b3cb277eb_box20.jpg,"RC0""",rc,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,0,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box0.jpg,bedrm,bedrm,rooms,rooms
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,1,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box1.jpg,2 car qarage,car qarage,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,2,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box2.jpg,mbath,mbath,bathrooms,bathrooms
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,3,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box3.jpg,dining,dining,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,4,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box4.jpg,bedrm,bedrm,rooms,rooms
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,5,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box5.jpg,Family,family,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,6,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box6.jpg,mstr ste,mstr ste,others,rooms
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,7,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box7.jpg,porch,porch,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,8,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box8.jpg,study,study,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,9,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box9.jpg,kitchen,kitchen,kitchens,kitchens
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,10,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box10.jpg,lanai,lanai,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,11,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box11.jpg,Fover,fover,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,12,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box12.jpg,wic,wic,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,13,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box13.jpg,,,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,14,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box14.jpg,pantrv,pantrv,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,15,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box15.jpg,pdr,pdr,others,bathrooms
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,16,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box16.jpg,util,util,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,17,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box17.jpg,Da,da,others,bathrooms
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,18,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box18.jpg,,,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,19,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box19.jpg,,,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,20,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box20.jpg,,,others,others
+15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c.jpg,21,15_3_jpg.rf.554ce831dc0587f0c99e9df29f00713c_box21.jpg,tond,tond,others,bathrooms
+17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f.jpg,0,17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f_box0.jpg,(APAGE,apage,others,others
+17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f.jpg,1,17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f_box1.jpg,,,others,halls
+17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f.jpg,2,17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f_box2.jpg,UviA,uvia,others,halls
+17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f.jpg,3,17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f_box3.jpg,dAPAdE,dapade,others,others
+17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f.jpg,4,17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f_box4.jpg,PTTq,pttq,others,others
+17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f.jpg,5,17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f_box5.jpg,COVTED PORCr,covted porcr,others,others
+17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f.jpg,6,17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f_box6.jpg,,,others,others
+17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f.jpg,7,17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f_box7.jpg,COVLRID PODC,covlrid podc,others,others
+17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f.jpg,8,17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f_box8.jpg,,,others,kitchens
+17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f.jpg,9,17_25_jpg.rf.214a4ff908ca13d58c6bbf3641ebf51f_box9.jpg,,,others,kitchens
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,0,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box0.jpg,ENtR,entr,others,others
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,1,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box1.jpg,KITCHEN,kitchen,kitchens,kitchens
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,2,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box2.jpg,NoOK,nook,others,others
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,3,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box3.jpg,KITCHEN,kitchen,kitchens,kitchens
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,4,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box4.jpg,POWDER,powder,bathrooms,bathrooms
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,5,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box5.jpg,GARAGE,garage,others,others
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,6,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box6.jpg,POWDER,powder,bathrooms,bathrooms
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,7,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box7.jpg,ENTRY,entry,others,others
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,8,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box8.jpg,NOOK,nook,others,others
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,9,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box9.jpg,GARAGE,garage,others,others
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,10,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box10.jpg,LMING ROON,lming roon,others,halls
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,11,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box11.jpg,LIVING ROOM,living room,halls,halls
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,12,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box12.jpg,PORCH,porch,others,others
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,13,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box13.jpg,PORCH,porch,others,others
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,14,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box14.jpg,,,others,others
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,15,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box15.jpg,,,others,others
+17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2.jpg,16,17_7_jpg.rf.41ebcc0a2be829e87ba20b6e79f4abb2_box16.jpg,,,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,0,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box0.jpg,84,,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,1,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box1.jpg,M81R,mr,others,rooms
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,2,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box2.jpg,GA ao,ga ao,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,3,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box3.jpg,COVERED,covered,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,4,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box4.jpg,,,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,5,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box5.jpg,AEST SUMe,aest sume,others,rooms
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,6,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box6.jpg,IALLWAY,iallway,others,halls
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,7,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box7.jpg,84FE R204,fe r,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,8,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box8.jpg,,,others,kitchens
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,9,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box9.jpg,,,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,10,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box10.jpg,,,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,11,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box11.jpg,,,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,12,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box12.jpg,G,g,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,13,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box13.jpg,LnUCR,lnucr,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,14,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box14.jpg,,,others,bathrooms
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,15,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box15.jpg,ONa,ona,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,16,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box16.jpg,,,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,17,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box17.jpg,,,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,18,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box18.jpg,,,others,bathrooms
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,19,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box19.jpg,,,others,others
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,21,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box21.jpg,BATN (,batn,others,bathrooms
+19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7.jpg,22,19_17_jpg.rf.e91e7b619ed0b936be992b3751f37ed7_box22.jpg,,,others,others
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,0,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box0.jpg,,,others,halls
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,1,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box1.jpg,,,others,rooms
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,2,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box2.jpg,,,others,others
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,3,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box3.jpg,,,others,others
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,4,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box4.jpg,,,others,others
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,5,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box5.jpg,,,others,others
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,6,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box6.jpg,,,others,others
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,7,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box7.jpg,,,others,others
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,8,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box8.jpg,,,others,others
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,9,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box9.jpg,,,others,bathrooms
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,11,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box11.jpg,,,others,kitchens
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,12,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box12.jpg,,,others,others
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,13,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box13.jpg,,,others,others
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,14,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box14.jpg,,,others,others
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,17,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box17.jpg,,,others,rooms
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,19,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box19.jpg,,,others,bathrooms
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,20,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box20.jpg,,,others,others
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,21,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box21.jpg,,,others,rooms
+19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d.jpg,25,19_25_jpg.rf.5ed797bc008e510bb886ee75fc4b3b3d_box25.jpg,,,others,others
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,0,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box0.jpg,,,others,rooms
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,1,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box1.jpg,,,others,halls
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,2,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box2.jpg,couutbtotc Heracc,couutbtotc heracc,others,others
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,3,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box3.jpg,,,others,others
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,4,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box4.jpg,,,others,others
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,5,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box5.jpg,,,others,others
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,6,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box6.jpg,,,others,bathrooms
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,7,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box7.jpg,,,others,kitchens
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,8,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box8.jpg,,,others,others
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,9,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box9.jpg,,,others,others
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,10,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box10.jpg,,,others,others
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,11,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box11.jpg,,,others,others
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,12,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box12.jpg,,,others,others
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,13,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box13.jpg,,,others,others
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,14,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box14.jpg,,,others,others
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,15,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box15.jpg,Co4IIe,coiie,others,others
+30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807.jpg,16,30_22_jpg.rf.aa6b5f62c7d2ce4b9a8f3c15cea63807_box16.jpg,,,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,0,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box0.jpg,FAMILY RM,family rm,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,1,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box1.jpg,WORK SHOP,work shop,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,2,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box2.jpg,LANAI,lanai,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,3,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box3.jpg,BATH,bath,bathrooms,bathrooms
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,4,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box4.jpg,MSTR STE,mstr ste,others,rooms
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,5,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box5.jpg,BED RM,bed rm,rooms,rooms
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,6,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box6.jpg,M BATH,m bath,bathrooms,bathrooms
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,7,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box7.jpg,BED RM,bed rm,rooms,rooms
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,8,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box8.jpg,NOOK,nook,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,9,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box9.jpg,DINING,dining,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,10,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box10.jpg,FRONT PORCH,front porch,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,11,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box11.jpg,sitting,sitting,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,12,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box12.jpg,KITCHEN,kitchen,kitchens,kitchens
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,13,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box13.jpg,FOYER,foyer,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,14,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box14.jpg,wic,wic,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,15,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box15.jpg,wic,wic,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,16,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box16.jpg,BBQ PORCH,bbq porch,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,17,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box17.jpg,STOR,stor,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,18,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box18.jpg,wic,wic,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,19,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box19.jpg,UTIL,util,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,20,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box20.jpg,TWO CAR GARAGE,two car garage,others,others
+39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa.jpg,21,39_16_jpg.rf.c7587472a3cd512558ff2798cb1656aa_box21.jpg,stair,stair,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,0,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box0.jpg,FOYER,foyer,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,1,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box1.jpg,BED #3,bed,rooms,rooms
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,2,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box2.jpg,,,others,rooms
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,3,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box3.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,4,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box4.jpg,BED 22,bed,rooms,rooms
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,5,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box5.jpg,,,others,halls
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,6,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box6.jpg,2-CRGaRc,crgarc,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,7,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box7.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,8,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box8.jpg,ZitoeN,zitoen,others,kitchens
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,9,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box9.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,10,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box10.jpg,Usitk p,usitk p,others,rooms
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,11,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box11.jpg,REAR PO?C,rear poc,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,12,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box12.jpg,,,others,rooms
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,13,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box13.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,14,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box14.jpg,,,others,bathrooms
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,15,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box15.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,16,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box16.jpg,OFICE,ofice,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,17,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box17.jpg,,,others,bathrooms
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,18,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box18.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,19,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box19.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,20,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box20.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,21,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box21.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,22,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box22.jpg,,,others,bathrooms
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,23,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box23.jpg,BONUS ROQV FLCOK FLAN,bonus roqv flcok flan,others,rooms
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,24,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box24.jpg,,,others,rooms
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,25,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box25.jpg,,,others,bathrooms
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,26,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box26.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,27,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box27.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,28,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box28.jpg,BONUS ROOM,bonus room,rooms,rooms
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,29,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box29.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,31,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box31.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,32,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box32.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,33,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box33.jpg,FLCOH FLAN,flcoh flan,others,rooms
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,34,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box34.jpg,,,others,others
+61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9.jpg,35,61_15_jpg.rf.c0b581f813e25ae47d432a1d9971e4c9_box35.jpg,,,others,bathrooms
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,0,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box0.jpg,Gaa,gaa,others,others
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,1,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box1.jpg,,,others,others
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,2,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box2.jpg,,,others,halls
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,3,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box3.jpg,CloseT,closet,others,others
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,4,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box4.jpg,,,others,others
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,5,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box5.jpg,iche,iche,others,kitchens
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,6,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box6.jpg,,,others,rooms
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,7,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box7.jpg,,,others,others
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,8,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box8.jpg,Mukoo,mukoo,others,others
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,9,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box9.jpg,,,others,others
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,10,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box10.jpg,,,others,bathrooms
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,11,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box11.jpg,FOiER,foier,others,others
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,12,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box12.jpg,Scaeenee RoOL,scaeenee rool,others,others
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,13,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box13.jpg,,,others,others
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,14,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box14.jpg,,,others,bathrooms
+71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4.jpg,15,71_7_jpg.rf.1f86594917134888abec9c8b22b66cd4_box15.jpg,,,others,others
