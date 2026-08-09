@@ -56,12 +56,11 @@ def _split(image_files: list, eval_fraction: float, seed: int) -> tuple:
 
 
 def cmd_extract(args):
-    import numpy as np
     from PIL import Image
     from ultralytics import YOLO
     import easyocr
 
-    from src.floorplan import FLOORPLAN_MODEL_PATH, classify_room_label
+    from src.floorplan import FLOORPLAN_MODEL_PATH, classify_room_label, prepare_ocr_crop
 
     image_files = [
         f for f in sorted(os.listdir(args.images_dir)) if f.lower().endswith((".jpg", ".jpeg", ".png"))
@@ -109,12 +108,12 @@ def cmd_extract(args):
 
                 coords = box.xyxy[0].cpu().numpy().astype(int)
                 x1, y1, x2, y2 = coords
-                crop = img_pil.crop((x1, y1, x2, y2))
+                crop_np = prepare_ocr_crop(img_pil, x1, y1, x2, y2)
 
                 crop_file = f"{os.path.splitext(image_name)[0]}_box{box_index}.jpg"
-                crop.save(os.path.join(crops_dir, crop_file))
+                Image.fromarray(crop_np).save(os.path.join(crops_dir, crop_file))
 
-                ocr_result_list = reader.readtext(np.array(crop), detail=0)
+                ocr_result_list = reader.readtext(crop_np, detail=0)
                 raw_text = " ".join(ocr_result_list)
                 cleaned_text = re.sub(r"[^a-z\s]", "", raw_text.lower()).strip()
                 predicted_class = classify_room_label(cleaned_text)

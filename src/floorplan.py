@@ -21,6 +21,42 @@ _yolo_model = None  # Lazy-load the YOLO model
 _ocr_reader = None  # Lazy-load the OCR model
 
 
+def prepare_ocr_crop(img_pil: Image.Image, x1: int, y1: int, x2: int, y2: int) -> np.ndarray:
+    """Pads and upscales a detected room_name box before handing it to OCR.
+
+    eval/REPORT.md's held-out measurement of classify_room_label found
+    that *every* one of its real-category misclassifications traced back
+    to OCR returning empty or corrupted text, not to the substring rules
+    -- and that this tracked crop size: boxes OCR failed on averaged
+    28x14px, versus 57x17px for boxes it read successfully, and crops
+    that failed were confirmed by eye to contain perfectly legible text
+    (e.g. "DINING", "BATH") at 5x upscale. This is that fix: pad the box
+    by 15% a side (a tight YOLO box can clip a character's edge) and
+    upscale so the crop is at least MIN_HEIGHT tall, capped at MAX_SCALE
+    to avoid blowing up already-adequate crops into blur.
+    """
+    MIN_HEIGHT = 48
+    MAX_SCALE = 6
+
+    img_w, img_h = img_pil.size
+    box_w, box_h = x2 - x1, y2 - y1
+    pad_x = max(2, int(box_w * 0.15))
+    pad_y = max(2, int(box_h * 0.15))
+    x1 = max(0, x1 - pad_x)
+    y1 = max(0, y1 - pad_y)
+    x2 = min(img_w, x2 + pad_x)
+    y2 = min(img_h, y2 + pad_y)
+
+    crop = img_pil.crop((x1, y1, x2, y2))
+
+    scale = min(MAX_SCALE, max(1.0, MIN_HEIGHT / max(1, crop.height)))
+    if scale > 1.0:
+        new_size = (max(1, int(crop.width * scale)), max(1, int(crop.height * scale)))
+        crop = crop.resize(new_size, Image.LANCZOS)
+
+    return np.array(crop)
+
+
 def classify_room_label(detected_text: str) -> str:
     """Classify a cleaned OCR label into one of the room-count buckets.
 
@@ -103,8 +139,7 @@ def parse_floorplan(local_image_path: str) -> dict:
                 coords = box.xyxy[0].cpu().numpy().astype(int)
                 x1, y1, x2, y2 = coords
 
-                cropped_img_pil = img_pil.crop((x1, y1, x2, y2))
-                cropped_img_np = np.array(cropped_img_pil)
+                cropped_img_np = prepare_ocr_crop(img_pil, x1, y1, x2, y2)
 
                 ocr_result_list = _ocr_reader.readtext(cropped_img_np, detail=0)
 
