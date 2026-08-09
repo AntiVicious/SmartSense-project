@@ -57,7 +57,7 @@ POSTGRES_DB=real_estate_db
 | 🧾 Excel/CSV | `data/` | Place `Property_list.xlsx` or `.csv` |
 | 🏠 Images | `data/images/` | Floorplan images |
 | 📜 PDFs | `data/pdfs/` | Certificate PDFs (e.g., `fire-safety.pdf`) |
-| 🧠 Model | `src/` | Trained YOLO model (`best.pt`, `best_300.pt`, etc.) |
+| 🧠 Model | `src/` | Trained YOLO model (`best_1000.pt`) |
 
 #### Run the App
 ```bash
@@ -80,7 +80,6 @@ SmartSense-project/
 │   ├── main.py              # Streamlit frontend (UI)
 │   ├── run.sh               # Runs FastAPI + Streamlit in one container
 │   ├── Dockerfile
-│   ├── best_300.pt          # Trained model (300 epochs)
 │   └── best_1000.pt         # Trained model (1000 epochs)
 │
 ├── data/

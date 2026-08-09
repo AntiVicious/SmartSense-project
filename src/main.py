@@ -30,9 +30,6 @@ def _probe_backend(timeout: float = 2.0):
         return False, str(e.__class__.__name__)
 
 
-# --- Sidebar: hoisted to the top so button handlers can read model_choice ---
-# Streamlit runs top-to-bottom. The previous version declared model_choice
-# AFTER the ingest/parse buttons, so those handlers never saw the user's choice.
 st.sidebar.header("System Status")
 status_placeholder = st.sidebar.empty()
 
@@ -84,15 +81,6 @@ if not st.session_state.backend_ready:
             if st.sidebar.button("🔄 Retry connection"):
                 st.rerun()
 
-st.sidebar.divider()
-st.sidebar.header("Model Configuration")
-model_choice = st.sidebar.selectbox(
-    "Choose Floorplan Model",
-    ("best_1000.pt", "best_300.pt"),
-    help="Select the model to use for floorplan parsing. The 1000-epoch model may be more accurate but slower."
-)
-st.sidebar.caption(f"Using: {model_choice}")
-
 # --- 1. Ingestion UI ---
 st.header("Data Ingestion")
 
@@ -102,12 +90,7 @@ if st.button("Start Ingestion"):
         files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
         try:
             with st.spinner("Ingesting data... This may take a moment."):
-                # Pass the selected model to the backend (was previously ignored).
-                response = requests.post(
-                    f"{BACKEND_URL}/ingest",
-                    files=files,
-                    params={"model_name": model_choice},
-                )
+                response = requests.post(f"{BACKEND_URL}/ingest", files=files)
             if response.status_code == 200:
                 st.success(response.json()['message'])
             else:
@@ -131,12 +114,7 @@ if st.button("Parse Floorplan"):
         files = {'file': (uploaded_image.name, uploaded_image.getvalue(), uploaded_image.type)}
         try:
             with st.spinner("Parsing image..."):
-                # Pass the selected model to the backend (was previously ignored).
-                response = requests.post(
-                    f"{BACKEND_URL}/parse-floorplan-debug",
-                    files=files,
-                    params={"model_name": model_choice},
-                )
+                response = requests.post(f"{BACKEND_URL}/parse-floorplan-debug", files=files)
 
             if response.status_code == 200:
                 st.success("Image parsed successfully!")

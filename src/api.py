@@ -80,34 +80,35 @@ embedding_model = HuggingFaceEmbeddings(model_name='all-MiniLM-L6-v2')
 EMBEDDING_DIM = len(embedding_model.embed_query("dimension probe"))
 
 # --- 4. Phase 1: Floorplan Model (YOLO+OCR) ---
-model_cache = {}   # This will store our loaded models
+FLOORPLAN_MODEL_PATH = "/app/best_1000.pt"
+
+yolo_model = None  # Lazy-load the YOLO model
 ocr_reader = None  # Lazy-load the OCR model
 
-def parse_floorplan(local_image_path: str, model_name: str = "best_1000.pt") -> dict:
-    global model_cache, ocr_reader
+def parse_floorplan(local_image_path: str) -> dict:
+    global yolo_model, ocr_reader
 
     # Lazy-load YOLO model
-    if model_name not in model_cache:
-        model_path = os.path.join("/app", model_name)
-        if not os.path.exists(model_path):
-            print(f"Error: Model file not found at {model_path}")
-            return {"error": f"Model file not found: {model_name}"}
-        print(f"Loading floorplan model {model_name}...")
-        model_cache[model_name] = YOLO(model_path)
-    
-    model = model_cache[model_name] # Use the selected model
-    
+    if yolo_model is None:
+        if not os.path.exists(FLOORPLAN_MODEL_PATH):
+            print(f"Error: Model file not found at {FLOORPLAN_MODEL_PATH}")
+            return {"error": f"Model file not found: {FLOORPLAN_MODEL_PATH}"}
+        print(f"Loading floorplan model {FLOORPLAN_MODEL_PATH}...")
+        yolo_model = YOLO(FLOORPLAN_MODEL_PATH)
+
+    model = yolo_model
+
     # Lazy-load OCR model
     if ocr_reader is None:
         print("Lazy loading OCR model (EasyOCR)...")
         ocr_reader = easyocr.Reader(['en'])
         print("OCR model loaded.")
-    
+
     if not os.path.exists(local_image_path):
         print(f"Error: Image file not found at {local_image_path}")
         return {"error": f"Image file not found: {local_image_path}"}
-    
-    print(f"Parsing image: {local_image_path} with model: {model_name}")
+
+    print(f"Parsing image: {local_image_path}")
     
     try:
         img_pil = Image.open(local_image_path).convert("RGB")
@@ -414,7 +415,7 @@ async def chat_endpoint(request: ChatRequest, fast_api_request: Request):
         print(f"Agent execution error: {e}")
         raise HTTPException(status_code=500, detail=f"Agent Error: {e}")
 
-def _ingest_properties_sync(file_contents: bytes, model_name: str) -> dict:
+def _ingest_properties_sync(file_contents: bytes) -> dict:
     db = SessionLocal()
     try:
         df = pd.read_excel(io.BytesIO(file_contents))
@@ -445,7 +446,7 @@ def _ingest_properties_sync(file_contents: bytes, model_name: str) -> dict:
             # Construct the local path to the image
             local_image_path = os.path.join("/app/data/images", str(image_filename))
             
-            floorplan_data = parse_floorplan(local_image_path, model_name)
+            floorplan_data = parse_floorplan(local_image_path)
             if floorplan_data.get("error"):
                 print(f"Skipping row {index}: {floorplan_data['error']}")
                 continue 
@@ -511,15 +512,15 @@ def _ingest_properties_sync(file_contents: bytes, model_name: str) -> dict:
         db.close()
 
 @app.post("/ingest")
-async def ingest_properties(file: UploadFile = File(...), model_name: str = "best_1000.pt"):
+async def ingest_properties(file: UploadFile = File(...)):
     # Read the file into an in-memory bytes buffer (async I/O), then hand the
     # CPU-heavy parsing/ingest work (pandas, YOLO, EasyOCR, DB writes) off to a
     # worker thread so it doesn't block the event loop for the whole request.
     file_contents = await file.read()
-    return await run_in_threadpool(_ingest_properties_sync, file_contents, model_name)
+    return await run_in_threadpool(_ingest_properties_sync, file_contents)
 
 @app.post("/parse-floorplan-debug")
-async def parse_floorplan_debug(file: UploadFile = File(...), model_name: str = "best_1000.pt"):
+async def parse_floorplan_debug(file: UploadFile = File(...)):
     contents = await file.read()
 
     # Never trust the client-supplied filename as a path (path traversal) —
@@ -528,7 +529,7 @@ async def parse_floorplan_debug(file: UploadFile = File(...), model_name: str = 
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(contents)
-        data = await run_in_threadpool(parse_floorplan, file_path, model_name)
+        data = await run_in_threadpool(parse_floorplan, file_path)
     finally:
         os.remove(file_path)
 
