@@ -1,16 +1,22 @@
 """FastAPI app: routes and startup wiring only.
 
 All client construction is lazy and lives in db.py; all business logic
-lives in floorplan.py, documents.py, agents.py, and ingest.py. lifespan
-builds each client exactly once at startup and stores it on app.state;
-routes pull what they need via Depends, which just reads app.state.
+lives in floorplan.py, documents.py, agents.py. lifespan builds each
+client exactly once at startup and stores it on app.state; routes pull
+what they need via Depends, which just reads app.state.
+
+Property ingestion itself runs as an Airflow DAG (dags/), not inline in a
+request handler -- POST /ingest only lands the uploaded file and creates
+an ingest_jobs row; GET /ingest/{job_id} reads that row back. The
+/internal/* endpoints are how the DAG reaches the already-loaded
+YOLO/EasyOCR/embedding models without Airflow's own image needing torch.
 """
 
 import os
 import tempfile
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from langchain_core.messages import AIMessage, HumanMessage
@@ -21,8 +27,8 @@ from .agents import build_agent_executor
 from .config import Settings, get_settings
 from .db import Base, get_embedder, get_engine, get_qdrant_client, get_session_factory
 from .floorplan import parse_floorplan
-from .ingest import ingest_properties_sync
-from .models import ChatRequest
+from .ingest_landing import UnsupportedFileType, land_ingest_file
+from .models import ChatRequest, InternalEmbedRequest, InternalParseFloorplanRequest, IngestJob
 
 
 # -----------------------------------------------------------------
@@ -109,6 +115,18 @@ def get_app_agent_executor(request: Request):
     return request.app.state.agent_executor
 
 
+def verify_internal_api_key(
+    x_internal_api_key: str = Header(default=""),
+    settings: Settings = Depends(get_app_settings),
+):
+    """Gate for /internal/*. These run real inference on request and are
+    reachable by anything on the Docker network (the port isn't published
+    to the host, but that's not the same as authenticated) -- this is the
+    shared secret Airflow's Connection for the internal API carries."""
+    if not x_internal_api_key or x_internal_api_key != settings.INTERNAL_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing internal API key")
+
+
 # --- API Endpoints ---
 
 
@@ -174,26 +192,64 @@ async def chat_endpoint(request: ChatRequest, agent_executor=Depends(get_app_age
         raise HTTPException(status_code=500, detail=f"Agent Error: {e}")
 
 
-@app.post("/ingest")
+@app.post("/ingest", status_code=202)
 async def ingest_properties(
     file: UploadFile = File(...),
     session_factory=Depends(get_app_session_factory),
-    qdrant_client=Depends(get_app_qdrant_client),
-    embedder=Depends(get_app_embedder),
     settings: Settings = Depends(get_app_settings),
 ):
-    # Read the file into an in-memory bytes buffer (async I/O), then hand the
-    # CPU-heavy parsing/ingest work (pandas, YOLO, EasyOCR, DB writes) off to a
-    # worker thread so it doesn't block the event loop for the whole request.
+    # Ingestion itself doesn't happen here anymore -- this just lands the
+    # file where the Airflow poller DAG will find it and records a job row.
+    # See dags/watch_ingest_landing_dag.py and dags/ingest_properties_dag.py.
     file_contents = await file.read()
-    return await run_in_threadpool(
-        ingest_properties_sync,
-        file_contents,
-        session_factory=session_factory,
-        qdrant_client=qdrant_client,
-        embedder=embedder,
-        qdrant_collection=settings.QDRANT_VECTOR_COLLECTION,
-    )
+    try:
+        job_id = await run_in_threadpool(
+            land_ingest_file,
+            session_factory=session_factory,
+            landing_dir=settings.INGEST_LANDING_DIR,
+            file_bytes=file_contents,
+            original_filename=file.filename,
+        )
+    except UnsupportedFileType as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {"status": "queued", "job_id": job_id, "status_url": f"/ingest/{job_id}"}
+
+
+@app.get("/ingest/{job_id}")
+async def get_ingest_job(job_id: str, session_factory=Depends(get_app_session_factory)):
+    def _query():
+        db = session_factory()
+        try:
+            return db.query(IngestJob).filter(IngestJob.job_id == job_id).one_or_none()
+        finally:
+            db.close()
+
+    job = await run_in_threadpool(_query)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "original_filename": job.original_filename,
+        "dag_run_id": job.dag_run_id,
+        "rows_ingested": job.rows_ingested,
+        "error_message": job.error_message,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "updated_at": job.updated_at.isoformat() if job.updated_at else None,
+    }
+
+
+@app.post("/internal/parse-floorplan", dependencies=[Depends(verify_internal_api_key)])
+async def internal_parse_floorplan(request: InternalParseFloorplanRequest):
+    return await run_in_threadpool(parse_floorplan, request.image_path)
+
+
+@app.post("/internal/embed", dependencies=[Depends(verify_internal_api_key)])
+async def internal_embed(request: InternalEmbedRequest, embedder=Depends(get_app_embedder)):
+    vector = await run_in_threadpool(embedder.embed_query, request.text)
+    return {"embedding": vector}
 
 
 @app.post("/parse-floorplan-debug")

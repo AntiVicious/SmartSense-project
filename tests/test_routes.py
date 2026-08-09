@@ -16,7 +16,9 @@ Postgres, no real Qdrant, no real LLM, no real YOLO/EasyOCR:
 
 import io
 import os
+import shutil
 import sys
+import tempfile
 from contextlib import asynccontextmanager
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -27,6 +29,7 @@ import pandas as pd  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
+from sqlalchemy.pool import StaticPool  # noqa: E402
 
 import src.api as api_module  # noqa: E402
 from src.api import (  # noqa: E402
@@ -39,6 +42,9 @@ from src.api import (  # noqa: E402
     get_app_settings,
 )
 from src.db import Base  # noqa: E402
+from src.models import IngestJob  # noqa: E402
+
+INTERNAL_API_KEY = "test-internal-key"
 
 
 @asynccontextmanager
@@ -97,7 +103,10 @@ class FakeEmbedder:
 
 
 class FakeSettings:
-    QDRANT_VECTOR_COLLECTION = "properties"
+    def __init__(self, landing_dir=None):
+        self.QDRANT_VECTOR_COLLECTION = "properties"
+        self.INTERNAL_API_KEY = INTERNAL_API_KEY
+        self.INGEST_LANDING_DIR = landing_dir or tempfile.mkdtemp()
 
 
 class FakeAgentExecutor:
@@ -114,7 +123,18 @@ class FakeAgentExecutor:
 
 
 def _make_session_factory():
-    engine = create_engine("sqlite:///:memory:")
+    # StaticPool + check_same_thread=False: routes that use run_in_threadpool
+    # (POST /ingest, GET /ingest/{job_id}) run their DB work in a worker
+    # thread, not the thread that called create_all() below. SQLAlchemy's
+    # default pool for sqlite:///:memory: is thread-scoped (a fresh,
+    # separate in-memory DB per thread), so without this the worker thread
+    # would see an empty database with no tables at all. StaticPool shares
+    # one real connection across every thread instead.
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine)
 
@@ -240,37 +260,168 @@ def test_chat_agent_exception_returns_500_with_detail():
         app.dependency_overrides.clear()
 
 
-def test_ingest_route_wires_dependency_overrides():
+def test_ingest_route_lands_file_and_creates_queued_job():
+    # /ingest no longer ingests anything itself -- it lands the upload for
+    # the Airflow poller DAG and records a job row. No image_file/rooms/etc
+    # in the payload matters here; that's the DAG's job now, tested in
+    # dags/tests, not this route.
     session_factory = _make_session_factory()
-    qdrant_client = FakeQdrantClient()
-    embedder = FakeEmbedder()
+    landing_dir = tempfile.mkdtemp()
+    try:
+        app.dependency_overrides[get_app_session_factory] = lambda: session_factory
+        app.dependency_overrides[get_app_settings] = lambda: FakeSettings(landing_dir=landing_dir)
+        try:
+            excel_bytes = _make_excel_bytes([{"title": "Anything", "location": "X"}])
+            with TestClient(app) as client:
+                resp = client.post(
+                    "/ingest",
+                    files={
+                        "file": (
+                            "props.xlsx",
+                            excel_bytes,
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        )
+                    },
+                )
+            assert resp.status_code == 202
+            body = resp.json()
+            assert body["status"] == "queued"
+            job_id = body["job_id"]
+            assert body["status_url"] == f"/ingest/{job_id}"
+
+            landed_files = os.listdir(landing_dir)
+            assert landed_files == [f"{job_id}.xlsx"]
+
+            db = session_factory()
+            try:
+                job = db.query(IngestJob).filter(IngestJob.job_id == job_id).one()
+                assert job.status == "queued"
+                assert job.original_filename == "props.xlsx"
+            finally:
+                db.close()
+        finally:
+            app.dependency_overrides.clear()
+    finally:
+        shutil.rmtree(landing_dir, ignore_errors=True)
+
+
+def test_ingest_route_rejects_unsupported_file_type():
+    session_factory = _make_session_factory()
+    landing_dir = tempfile.mkdtemp()
+    try:
+        app.dependency_overrides[get_app_session_factory] = lambda: session_factory
+        app.dependency_overrides[get_app_settings] = lambda: FakeSettings(landing_dir=landing_dir)
+        try:
+            with TestClient(app) as client:
+                resp = client.post(
+                    "/ingest", files={"file": ("notes.txt", b"not a spreadsheet", "text/plain")}
+                )
+            assert resp.status_code == 400
+            assert os.listdir(landing_dir) == []
+        finally:
+            app.dependency_overrides.clear()
+    finally:
+        shutil.rmtree(landing_dir, ignore_errors=True)
+
+
+def test_get_ingest_job_returns_status():
+    session_factory = _make_session_factory()
+    db = session_factory()
+    try:
+        db.add(IngestJob(job_id="job-1", original_filename="a.xlsx", status="succeeded", rows_ingested=12))
+        db.commit()
+    finally:
+        db.close()
 
     app.dependency_overrides[get_app_session_factory] = lambda: session_factory
-    app.dependency_overrides[get_app_qdrant_client] = lambda: qdrant_client
-    app.dependency_overrides[get_app_embedder] = lambda: embedder
+    try:
+        with TestClient(app) as client:
+            resp = client.get("/ingest/job-1")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["job_id"] == "job-1"
+        assert body["status"] == "succeeded"
+        assert body["rows_ingested"] == 12
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_ingest_job_404_for_unknown_id():
+    session_factory = _make_session_factory()
+    app.dependency_overrides[get_app_session_factory] = lambda: session_factory
+    try:
+        with TestClient(app) as client:
+            resp = client.get("/ingest/does-not-exist")
+        assert resp.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_internal_parse_floorplan_rejects_missing_or_wrong_key():
     app.dependency_overrides[get_app_settings] = lambda: FakeSettings()
     try:
-        # No image_file on the row -> the row is skipped before
-        # ingest_properties_sync would ever call the *real* floorplan
-        # parser, so this exercises the route's DI wiring and response
-        # shape without needing a fake parser injected (that's covered
-        # in tests/test_ingest.py, at the function level).
-        rows = [{"title": "No Image Row", "location": "X", "price": 100, "image_file": ""}]
-        excel_bytes = _make_excel_bytes(rows)
+        with TestClient(app) as client:
+            resp = client.post("/internal/parse-floorplan", json={"image_path": "/x.jpg"})
+            assert resp.status_code == 401
+
+            resp = client.post(
+                "/internal/parse-floorplan",
+                json={"image_path": "/x.jpg"},
+                headers={"X-Internal-Api-Key": "wrong-key"},
+            )
+            assert resp.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_internal_parse_floorplan_with_valid_key_calls_parser():
+    original_parse_floorplan = api_module.parse_floorplan
+    captured_paths = []
+
+    def fake_parse_floorplan(path):
+        captured_paths.append(path)
+        return {"rooms": 2, "halls": 0, "kitchens": 1, "bathrooms": 1, "other rooms": 0}
+
+    api_module.parse_floorplan = fake_parse_floorplan
+    app.dependency_overrides[get_app_settings] = lambda: FakeSettings()
+    try:
         with TestClient(app) as client:
             resp = client.post(
-                "/ingest",
-                files={
-                    "file": (
-                        "props.xlsx",
-                        excel_bytes,
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    )
-                },
+                "/internal/parse-floorplan",
+                json={"image_path": "/app/data/images/house1.jpg"},
+                headers={"X-Internal-Api-Key": INTERNAL_API_KEY},
             )
         assert resp.status_code == 200
-        assert resp.json() == {"status": "success", "message": "Successfully ingested 0 properties."}
-        assert qdrant_client.upsert_calls == []  # nothing to upsert, no points built
+        assert resp.json() == {"rooms": 2, "halls": 0, "kitchens": 1, "bathrooms": 1, "other rooms": 0}
+        assert captured_paths == ["/app/data/images/house1.jpg"]
+    finally:
+        api_module.parse_floorplan = original_parse_floorplan
+        app.dependency_overrides.clear()
+
+
+def test_internal_embed_rejects_missing_key():
+    app.dependency_overrides[get_app_settings] = lambda: FakeSettings()
+    try:
+        with TestClient(app) as client:
+            resp = client.post("/internal/embed", json={"text": "hello"})
+        assert resp.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_internal_embed_with_valid_key_returns_embedding():
+    fake_embedder = FakeEmbedder()
+    app.dependency_overrides[get_app_settings] = lambda: FakeSettings()
+    app.dependency_overrides[get_app_embedder] = lambda: fake_embedder
+    try:
+        with TestClient(app) as client:
+            resp = client.post(
+                "/internal/embed",
+                json={"text": "a cozy two bedroom house"},
+                headers={"X-Internal-Api-Key": INTERNAL_API_KEY},
+            )
+        assert resp.status_code == 200
+        assert resp.json() == {"embedding": [0.1, 0.2, 0.3]}
     finally:
         app.dependency_overrides.clear()
 
@@ -307,7 +458,14 @@ CASES = [
     test_chat_builds_history_as_message_pairs,
     test_chat_agent_not_initialized_returns_500,
     test_chat_agent_exception_returns_500_with_detail,
-    test_ingest_route_wires_dependency_overrides,
+    test_ingest_route_lands_file_and_creates_queued_job,
+    test_ingest_route_rejects_unsupported_file_type,
+    test_get_ingest_job_returns_status,
+    test_get_ingest_job_404_for_unknown_id,
+    test_internal_parse_floorplan_rejects_missing_or_wrong_key,
+    test_internal_parse_floorplan_with_valid_key_calls_parser,
+    test_internal_embed_rejects_missing_key,
+    test_internal_embed_with_valid_key_returns_embedding,
     test_parse_floorplan_debug_route_returns_parser_output,
 ]
 

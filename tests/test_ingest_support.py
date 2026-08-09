@@ -25,7 +25,9 @@ def test_external_id_matches_known_value():
     # for the same inputs -- if this ever drifts from the migration's
     # (deliberately duplicated) copy of the algorithm, old rows and newly
     # ingested rows would stop matching.
-    assert compute_external_id("Old Cottage", "Springfield", "house1.jpg") == "a7a1bb912903124c132a61b9e231eca6"
+    assert (
+        compute_external_id("Old Cottage", "Springfield", "house1.jpg") == "a7a1bb912903124c132a61b9e231eca6"
+    )
 
 
 def test_external_id_differs_for_different_inputs():

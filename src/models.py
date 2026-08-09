@@ -43,9 +43,23 @@ class IngestJob(Base):
     rows_ingested = Column(Integer, nullable=True)
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
 
 
 class ChatRequest(BaseModel):
     query: str
     history: list[tuple[str, str]] = []
+
+
+class InternalParseFloorplanRequest(BaseModel):
+    """Body for POST /internal/parse-floorplan. image_path is a path on the
+    shared data volume (Airflow and the app both mount it) -- the Airflow
+    task never uploads image bytes over HTTP, just points at the file."""
+
+    image_path: str
+
+
+class InternalEmbedRequest(BaseModel):
+    text: str
