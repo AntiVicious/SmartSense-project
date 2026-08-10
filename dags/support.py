@@ -43,6 +43,9 @@ def get_postgres_engine():
     # produce "postgres://", which SQLAlchemy 1.4+/2.0 rejects outright;
     # it wants "postgresql://"), so this is more predictable.
     url = f"postgresql://{conn.login}:{conn.password}@{conn.host}:{conn.port}/{conn.schema}"
+    sslmode = conn.extra_dejson.get("sslmode")
+    if sslmode:
+        url += f"?sslmode={sslmode}"
     return create_engine(url)
 
 
@@ -54,7 +57,15 @@ def get_qdrant_client():
     from qdrant_client import QdrantClient
 
     conn = BaseHook.get_connection(QDRANT_CONN_ID)
-    return QdrantClient(host=conn.host, port=conn.port or 6333)
+    api_key = conn.extra_dejson.get("api_key")
+    if conn.conn_type in ("http", "https"):
+        # Qdrant Cloud (or any URL-addressed instance) -- the connection's
+        # scheme was parsed out of the URI into conn_type, e.g.
+        # "https://xyz.cloud.qdrant.io" gives conn_type="https", host="xyz...".
+        # No port appended: Qdrant Cloud serves HTTPS on the standard port,
+        # not 6333 -- matches src/db.py's get_qdrant_client() for the app.
+        return QdrantClient(url=f"{conn.conn_type}://{conn.host}", api_key=api_key)
+    return QdrantClient(host=conn.host, port=conn.port or 6333, api_key=api_key)
 
 
 def get_internal_api_config() -> tuple[str, str]:

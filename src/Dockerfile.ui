@@ -13,4 +13,8 @@ RUN pip install --no-cache-dir -r requirements-ui.txt
 
 COPY src/main.py ./src/main.py
 
-CMD ["python", "-m", "streamlit", "run", "src/main.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
+# Shell form (not exec-form JSON array) so $PORT actually expands --
+# Cloud Run injects PORT (default 8080) and requires the container listen
+# on whatever value it sets, not a hardcoded port. Defaults to 8501 to
+# match docker-compose.yml's local port mapping, where PORT is unset.
+CMD python -m streamlit run src/main.py --server.port ${PORT:-8501} --server.address 0.0.0.0

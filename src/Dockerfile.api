@@ -11,8 +11,27 @@ COPY requirements-heavy.txt .
 RUN pip install --no-cache-dir -r requirements-heavy.txt
 
 # --- 3. Install LIGHT Python Dependencies ---
-COPY requirements.txt .  
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# --- 3b. Pre-download EasyOCR and SentenceTransformer model weights ---
+# Without this, both download from the internet the first time they're
+# used -- EasyOCR's own status message warns this "may take several
+# minutes" -- which happens on every cold start on a platform with no
+# persistent local disk (Cloud Run), and was enough to blow past Cloud
+# Run's startup probe timeout outright. Baked in at build time instead,
+# same reasoning as best_1000.pt below.
+RUN python -c "import easyocr; easyocr.Reader(['en'])"
+RUN python -c "from langchain_community.embeddings import HuggingFaceEmbeddings; HuggingFaceEmbeddings(model_name='all-MiniLM-L6-v2')"
+
+# Runtime-only (set *after* the download step above, which needs network
+# access) -- without this, HuggingFaceEmbeddings still calls out to the HF
+# Hub on every startup to check for updates even though the model is
+# already cached, and that call hanging/slow on Cloud Run's network is
+# exactly what blew past the startup probe timeout. This forces it to use
+# the cache unconditionally, no network involved.
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
 
 # --- 4. Copy the App Code ---
 # Preserved as a package (src/api.py, src/config.py, ...) rather than
@@ -39,4 +58,8 @@ COPY data /app/data
 # One process per container (fix-list 2.1) -- this image no longer runs
 # Streamlit at all (see src/Dockerfile.ui), so there's nothing for a dead
 # uvicorn to hide behind: if this process dies, the container dies.
-CMD ["python", "-m", "uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell form (not exec-form JSON array) so $PORT actually expands --
+# Cloud Run injects PORT (default 8080) and requires the container listen
+# on whatever value it sets, not a hardcoded port. Defaults to 8000 to
+# match docker-compose.yml's local port mapping, where PORT is unset.
+CMD python -m uvicorn src.api:app --host 0.0.0.0 --port ${PORT:-8000}
