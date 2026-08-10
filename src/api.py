@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
+from groq import BadRequestError as GroqBadRequestError
 from langchain_core.messages import AIMessage, HumanMessage
 from qdrant_client.http.models import Distance, VectorParams
 from sqlalchemy import text
@@ -248,10 +249,38 @@ async def chat_endpoint(request: ChatRequest, agent_executor=Depends(get_app_age
         chat_history.append(HumanMessage(content=user_msg))
         chat_history.append(AIMessage(content=ai_msg))
 
+    agent_input = request.query
     try:
         # Run agent
-        response = await agent_executor.ainvoke({"input": request.query, "chat_history": chat_history})
+        response = await agent_executor.ainvoke({"input": agent_input, "chat_history": chat_history})
         return {"status": "success", "response": response["output"]}
+    except GroqBadRequestError as e:
+        # Groq's tool-call validator rejects `null` argument values outright
+        # (schema says e.g. "type": "string", and langchain's generated
+        # tool schema never marks it nullable even for Optional[...]
+        # params) -- but the model reaches for null specifically on vague
+        # queries ("show me anything"), which is a normal, expected input,
+        # not a real error. One retry with an explicit nudge resolves it
+        # in practice; anything past that falls through to the generic
+        # handler below rather than retrying forever.
+        if "tool_use_failed" not in str(e):
+            raise
+        logger.warning("Retrying chat request after a tool_use_failed response from Groq")
+        try:
+            nudged_input = (
+                f"{agent_input}\n\n"
+                "(Tool-calling note: when calling generate_property_report, omit any "
+                "argument you don't have a value for -- never pass null.)"
+            )
+            response = await agent_executor.ainvoke({"input": nudged_input, "chat_history": chat_history})
+            return {"status": "success", "response": response["output"]}
+        except Exception:
+            correlation_id = uuid.uuid4().hex[:12]
+            logger.exception("Agent execution failed after retry [correlation_id=%s]", correlation_id)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Internal error. Reference ID: {correlation_id}",
+            )
     except Exception:
         # Never return raw exception text to the client (fix-list 2.4) --
         # it can leak internals (stack frames, connection strings, prompt

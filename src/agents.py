@@ -7,6 +7,7 @@ time or hidden side effects. It's called once from api.py's lifespan.
 """
 
 import logging
+from typing import Optional
 
 from langchain.agents import AgentExecutor, create_sql_agent
 from langchain.agents.format_scratchpad.openai_tools import (
@@ -74,7 +75,10 @@ def build_agent_executor(
 
     @tool
     def generate_property_report(
-        location: str = None, min_price: float = None, max_price: float = None, min_rooms: int = None
+        location: Optional[str] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+        min_rooms: Optional[int] = None,
     ) -> str:
         """
         Generates a summary report of properties matching search criteria.
