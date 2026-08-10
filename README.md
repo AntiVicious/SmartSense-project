@@ -28,6 +28,76 @@ Built with: Python 3.10 · FastAPI · Streamlit · PostgreSQL · Qdrant · Airfl
 
 ---
 
+## Live Demo
+
+Deployed on Google Cloud Run at **$0/month** (Cloud Run + Neon Postgres +
+Qdrant Cloud free tiers — full architecture and cost breakdown in
+[DEPLOY.md](DEPLOY.md)):
+
+- **App**: https://smartsense-ui-606848550354.us-central1.run.app
+- **API**: https://smartsense-api-606848550354.us-central1.run.app
+  (`/docs` for the interactive schema, `/health` for live status)
+
+Both services scale to zero when idle, so the first request after a while
+takes ~30–40s to cold-start (loading YOLOv8 + EasyOCR + the embedding
+model into memory); requests after that are fast. The live database holds
+the 73-listing sample dataset from `data/`. The "Start Ingestion" button
+in the deployed UI won't actually complete a run — Airflow, which does
+the real ingestion work, only runs in the local Docker Compose stack (see
+[Ingestion Pipeline](#ingestion-pipeline-airflow)), not alongside this
+deployment.
+
+![SmartSense UI — data ingestion, floorplan parser, and the multi-agent chatbot answering a real query against the live database](docs/ui_screenshot.png)
+
+---
+
+## Architecture
+
+```mermaid
+flowchart TB
+    User(["Browser"])
+
+    subgraph cloudrun["Google Cloud Run — deployed, $0/month"]
+        UI["ui service<br/>Streamlit"]
+        API["api service<br/>FastAPI + LangChain agent<br/>YOLOv8 + EasyOCR in-process"]
+    end
+
+    subgraph stores["Managed data stores — free tier"]
+        PG[("Neon Postgres<br/>properties, ingest_jobs")]
+        QD[("Qdrant Cloud<br/>listing embeddings")]
+    end
+
+    GROQ["Groq API<br/>LLM inference"]
+
+    subgraph local["Local only (docker compose) — ingestion"]
+        AF["Airflow<br/>watch_ingest_landing -> ingest_properties"]
+    end
+
+    User -->|HTTPS| UI
+    UI -->|"REST, X-API-Key"| API
+    API --> PG
+    API --> QD
+    API -->|tool-calling agent| GROQ
+
+    AF -->|"/internal/parse-floorplan, /internal/embed"| API
+    AF --> PG
+    AF --> QD
+```
+
+Two independent paths:
+
+- **Serving (always on, deployed)**: browser → `ui` → `api` → Postgres +
+  Qdrant for data, Groq for the chat agent's reasoning. That's the entire
+  deployed footprint — two Cloud Run services, nothing else running.
+- **Ingestion (local only, one-off)**: Airflow orchestrates Extract → DQ →
+  Transform → Load, calling back into `api`'s `/internal/*` endpoints for
+  the CV inference and embeddings it doesn't run itself. It's never
+  deployed alongside the app — see [Ingestion Pipeline
+  (Airflow)](#ingestion-pipeline-airflow) for why, and how the live
+  deployment's database was actually populated without it.
+
+---
+
 ## How to Run
 
 ### 1. Prerequisites
@@ -39,7 +109,7 @@ Built with: Python 3.10 · FastAPI · Streamlit · PostgreSQL · Qdrant · Airfl
 ### 2. Clone and configure
 
 ```bash
-git clone [Your-Repo-URL]
+git clone https://github.com/AntiVicious/SmartSense-project.git
 cd SmartSense-project
 cp .env.example .env
 ```
@@ -439,8 +509,8 @@ adds a migration) — `docker compose up` does not run it automatically.
 
 `best_1000.pt` (~67MB) isn't committed to git. It's published as a
 [GitHub release asset](https://github.com/AntiVicious/SmartSense-project/releases/tag/model-weights-v1),
-and `src/Dockerfile` downloads it at build time (pinned to that release
-tag and a SHA256 checksum, so a build never silently picks up a
+and `src/Dockerfile.api` downloads it at build time (pinned to that
+release tag and a SHA256 checksum, so a build never silently picks up a
 different file).
 
 - **Building with Docker**: nothing to do — `docker compose up --build`
