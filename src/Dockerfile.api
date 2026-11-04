@@ -7,7 +7,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # --- 2. Install HEAVY Python Dependencies ---
-COPY requirements-heavy.txt .  
+# Every pip install below is held to the exact versions in
+# constraints-api.txt -- requirements*.txt are mostly unpinned.
+COPY constraints-api.txt .
+ENV PIP_CONSTRAINT=/app/constraints-api.txt
+COPY requirements-heavy.txt .
 RUN pip install --no-cache-dir -r requirements-heavy.txt
 
 # --- 3. Install LIGHT Python Dependencies ---

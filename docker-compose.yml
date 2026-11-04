@@ -210,6 +210,22 @@ services:
       - ./src:/opt/airflow/src:ro
     command: scheduler
 
+  # --- 7. Public tunnel -- opt-in, only with `docker compose --profile
+  # public up -d`. A Cloudflare quick tunnel: outbound-only (no router
+  # ports opened), no Cloudflare account needed. Only the ui is exposed;
+  # api, the databases and Airflow stay on this Compose network. The
+  # https://<random>.trycloudflare.com URL is printed in this service's
+  # logs and changes every time the container restarts. ---
+  tunnel:
+    image: cloudflare/cloudflared:2024.12.2
+    container_name: tunnel
+    profiles: ["public"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://ui:8501
+    depends_on:
+      ui:
+        condition: service_healthy
+
 # --- Define the persistent volumes ---
 volumes:
   postgres_data:

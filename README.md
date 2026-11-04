@@ -19,33 +19,32 @@ about the resulting portfolio through a multi-agent chatbot.
 - **Multi-agent chat**: a LangChain tool-calling agent routes each question
   to a SQL agent (structured queries), a RAG chain over Qdrant (semantic
   search), or a custom report generator.
-- **FastAPI + Streamlit**, each its own container/Cloud Run service (`api`
-  and `ui`) with an independent healthcheck — see [Deploying to Cloud
-  Run](DEPLOY.md).
+- **FastAPI + Streamlit**, each its own container (`api` and `ui`) with an
+  independent healthcheck.
 
 Built with: Python 3.10 · FastAPI · Streamlit · PostgreSQL · Qdrant · Airflow
 · YOLOv8 (Ultralytics) · EasyOCR · LangChain · Groq
 
 ---
 
-## Live Demo
+## Demo
 
-Deployed on Google Cloud Run at **$0/month** (Cloud Run + Neon Postgres +
-Qdrant Cloud free tiers — full architecture and cost breakdown in
-[DEPLOY.md](DEPLOY.md)):
+There's no always-on public deployment. The project ran on Google Cloud
+Run at $0/month (Cloud Run + Neon Postgres + Qdrant Cloud free tiers —
+architecture and cost breakdown in [DEPLOY.md](DEPLOY.md)) until the GCP
+billing account closed. To try it, run the full stack locally — see
+[How to Run](#how-to-run) — which also runs Airflow, so ingestion works
+end to end.
 
-- **App**: https://smartsense-ui-606848550354.us-central1.run.app
-- **API**: https://smartsense-api-606848550354.us-central1.run.app
-  (`/docs` for the interactive schema, `/health` for live status)
+To share a running local copy over the internet, start the optional
+Cloudflare quick tunnel. It exposes only the Streamlit UI (not the API,
+databases or Airflow), needs no account, and prints a temporary
+`https://<random>.trycloudflare.com` URL that changes on every restart:
 
-Both services scale to zero when idle, so the first request after a while
-takes ~30–40s to cold-start (loading YOLOv8 + EasyOCR + the embedding
-model into memory); requests after that are fast. The live database holds
-the 73-listing sample dataset from `data/`. The "Start Ingestion" button
-in the deployed UI won't actually complete a run — Airflow, which does
-the real ingestion work, only runs in the local Docker Compose stack (see
-[Ingestion Pipeline](#ingestion-pipeline-airflow)), not alongside this
-deployment.
+```bash
+docker compose --profile public up -d tunnel
+docker logs tunnel 2>&1 | grep trycloudflare
+```
 
 ![SmartSense UI — data ingestion, floorplan parser, and the multi-agent chatbot answering a real query against the live database](docs/ui_screenshot.png)
 
@@ -57,23 +56,20 @@ deployment.
 flowchart TB
     User(["Browser"])
 
-    subgraph cloudrun["Google Cloud Run — deployed, $0/month"]
+    TUN["Cloudflare quick tunnel<br/>optional, for sharing"]
+
+    subgraph host["Docker Compose on the host machine"]
         UI["ui service<br/>Streamlit"]
         API["api service<br/>FastAPI + LangChain agent<br/>YOLOv8 + EasyOCR in-process"]
-    end
-
-    subgraph stores["Managed data stores — free tier"]
-        PG[("Neon Postgres<br/>properties, ingest_jobs")]
-        QD[("Qdrant Cloud<br/>listing embeddings")]
+        PG[("Postgres<br/>properties, ingest_jobs")]
+        QD[("Qdrant<br/>listing embeddings")]
+        AF["Airflow<br/>watch_ingest_landing -> ingest_properties"]
     end
 
     GROQ["Groq API<br/>LLM inference"]
 
-    subgraph local["Local only (docker compose) — ingestion"]
-        AF["Airflow<br/>watch_ingest_landing -> ingest_properties"]
-    end
-
-    User -->|HTTPS| UI
+    User -->|HTTPS| TUN
+    TUN -->|"outbound-only tunnel (tunnel service)"| UI
     UI -->|"REST, X-API-Key"| API
     API --> PG
     API --> QD
@@ -86,15 +82,14 @@ flowchart TB
 
 Two independent paths:
 
-- **Serving (always on, deployed)**: browser → `ui` → `api` → Postgres +
-  Qdrant for data, Groq for the chat agent's reasoning. That's the entire
-  deployed footprint — two Cloud Run services, nothing else running.
-- **Ingestion (local only, one-off)**: Airflow orchestrates Extract → DQ →
+- **Serving**: browser → `ui` → `api` → Postgres + Qdrant for data, Groq
+  for the chat agent's reasoning. When shared through the tunnel, only
+  `ui` is reachable from the internet; everything else stays on the
+  Compose network.
+- **Ingestion**: Airflow orchestrates Extract → DQ →
   Transform → Load, calling back into `api`'s `/internal/*` endpoints for
-  the CV inference and embeddings it doesn't run itself. It's never
-  deployed alongside the app — see [Ingestion Pipeline
-  (Airflow)](#ingestion-pipeline-airflow) for why, and how the live
-  deployment's database was actually populated without it.
+  the CV inference and embeddings it doesn't run itself — see [Ingestion
+  Pipeline (Airflow)](#ingestion-pipeline-airflow).
 
 ---
 

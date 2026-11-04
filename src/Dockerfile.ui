@@ -8,8 +8,10 @@
 FROM python:3.10-slim
 WORKDIR /app
 
-COPY requirements-ui.txt .
-RUN pip install --no-cache-dir -r requirements-ui.txt
+# Held to the exact versions in constraints-ui.txt -- requirements-ui.txt
+# is unpinned.
+COPY constraints-ui.txt requirements-ui.txt ./
+RUN PIP_CONSTRAINT=constraints-ui.txt pip install --no-cache-dir -r requirements-ui.txt
 
 COPY src/main.py ./src/main.py
 
