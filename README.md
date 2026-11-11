@@ -95,11 +95,20 @@ Two independent paths:
 
 ## How to Run
 
+Everything runs in Docker, so the steps are the same on Windows, macOS and
+Linux. Plan for about 45–60 minutes the first time, most of it waiting for
+the first build.
+
 ### 1. Prerequisites
 
-- Docker & Docker Compose
-- Git
-- A [Groq](https://groq.com/) API key
+- **[Docker Desktop](https://www.docker.com/products/docker-desktop/)**
+  (or Docker Engine + the Compose plugin on Linux). Give it at least
+  **8GB of memory** (Docker Desktop → Settings → Resources) and keep about
+  **20GB of disk** free — the `api` image alone is ~10GB.
+- **Git**
+- **A [Groq](https://console.groq.com/keys) API key** — free; the chatbot
+  uses it for its LLM calls.
+- **Python 3** — only to generate the keys in step 2 (no packages needed).
 
 ### 2. Clone and configure
 
@@ -109,63 +118,121 @@ cd SmartSense-project
 cp .env.example .env
 ```
 
-Edit `.env`:
+(On Windows PowerShell, use `copy .env.example .env`.)
+
+Open `.env` and replace the four `YOUR_..._HERE` placeholders. Everything
+else can stay as it is for local use.
+
+| Variable | What to put there |
+|---|---|
+| `GROQ_API_KEY` | Your Groq key (`gsk_...`) |
+| `INTERNAL_API_KEY` | Any long random string — run the command below |
+| `API_KEY` | A *different* long random string — run it again |
+| `AIRFLOW_FERNET_KEY` | Output of the Fernet command below |
 
 ```bash
-GROQ_API_KEY=gsk_...
+# random string for INTERNAL_API_KEY / API_KEY (run twice)
+python -c "import secrets; print(secrets.token_hex(32))"
 
-# Database credentials (defaults are fine for local use)
-POSTGRES_USER=myuser
-POSTGRES_PASSWORD=mypassword
-POSTGRES_DB=real_estate_db
-
-# Shared secret between the app and Airflow -- see Ingestion Pipeline below
-INTERNAL_API_KEY=some-long-random-string
-
-# Gates POST /ingest and POST /parse-floorplan-debug -- the ui service
-# holds this and attaches it on your behalf, so you only need it yourself
-# for calling those endpoints directly. Generate like INTERNAL_API_KEY.
-API_KEY=some-other-long-random-string
-
-# Airflow's own metadata DB -- a separate Postgres instance from the one
-# above, not a second logical DB in it (see Ingestion Pipeline below)
-AIRFLOW_POSTGRES_USER=airflow
-AIRFLOW_POSTGRES_PASSWORD=airflow
-AIRFLOW_POSTGRES_DB=airflow
-AIRFLOW_ADMIN_USER=admin
-AIRFLOW_ADMIN_PASSWORD=admin
-AIRFLOW_FERNET_KEY=  # generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# AIRFLOW_FERNET_KEY
+python -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
 ```
 
-### 3. Add your data
+(Use `python3` instead of `python` if that's what your system has.)
 
-| Type | Folder | Notes |
-|---|---|---|
-| Excel/CSV | `data/` | e.g. `Property_list.xlsx` |
-| Floorplan images | `data/images/` | referenced by the `image_file` column |
-| Certificate PDFs | `data/certificates/` | referenced by the `certificates` column |
-| Model weights | `src/best_1000.pt` | fetched automatically by Docker — see [Model weights](#model-weights) below |
-
-### 4. Run it
+### 3. Build and start
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
-First build takes 30–45 minutes (PyTorch, Ultralytics, EasyOCR, etc.); the
-heavy dependency layer is cached separately from application code, so
-subsequent rebuilds after a code change take 1–2 minutes. `api` and `ui`
-are separate images (`src/Dockerfile.api` / `src/Dockerfile.ui`) — `ui`
-only needs Streamlit + `requests` (~760MB built, vs. `api`'s ~10GB), since
-it talks to `api` over HTTP and never imports torch/langchain itself. The
-Airflow image is also separate and lighter (no PyTorch/LangChain — see
-[Ingestion Pipeline](#ingestion-pipeline-airflow) below).
+The first build takes 30–45 minutes (PyTorch, Ultralytics, EasyOCR, …).
+After that, starting takes about a minute, and rebuilding after a code
+change takes 1–2 minutes because the heavy dependency layer is cached.
+
+Check that everything came up:
+
+```bash
+docker compose ps
+```
+
+Wait until `api` and `ui` show `(healthy)` — the API loads YOLOv8, EasyOCR
+and the embedding model at startup, so it needs about a minute.
+`airflow-init` showing `Exited (0)` is normal: it's a one-off setup step.
+
+### 4. Load the sample data
+
+A fresh install starts with empty databases. The repo ships a sample
+dataset — 73 listings in `data/Property_list.xlsx`, with their floorplans in
+`data/images/` and certificates in `data/certificates/`. Queue it for
+ingestion:
+
+```bash
+docker compose exec api python scripts/backfill_ingest.py data/
+```
+
+Airflow picks the file up within a minute and runs the pipeline (floorplan
+parsing, embeddings, loading Postgres and Qdrant). That takes a few minutes
+on CPU. You can watch it in the Airflow UI (see below) under the
+`ingest_properties` DAG. Once its run turns green, ask the chatbot
+something like *"How many listings have 3 bedrooms?"*
+
+Instead of the command, you can also upload `data/Property_list.xlsx`
+through **Data Ingestion → Start Ingestion** in the UI — it goes through
+the exact same pipeline.
+
+### 5. Open it
 
 - **UI:** http://localhost:8501
 - **API docs:** http://localhost:8000/docs
 - **Health check:** http://localhost:8000/health
-- **Airflow UI:** http://localhost:8080 (login with `AIRFLOW_ADMIN_USER` /
-  `AIRFLOW_ADMIN_PASSWORD`)
+- **Airflow UI:** http://localhost:8080 (log in with `AIRFLOW_ADMIN_USER` /
+  `AIRFLOW_ADMIN_PASSWORD` from `.env` — `admin` / `admin` by default)
+
+### 6. Stop it
+
+```bash
+docker compose down
+```
+
+Your data is kept in Docker volumes, so the next `docker compose up -d`
+starts where you left off (no rebuild, no re-ingestion). To wipe the
+databases and start from scratch, use `docker compose down -v` instead.
+
+### Using your own data
+
+Put your spreadsheet (Excel or CSV) in `data/`, its floorplan images in
+`data/images/` (referenced by the `image_file` column) and certificate PDFs
+in `data/certificates/` (referenced by the `certificates` column), then
+ingest it the same way as step 4. Re-ingesting a file updates rows in place
+rather than duplicating them. The floorplan model weights (`best_1000.pt`)
+are downloaded automatically during the build — see
+[Model weights](#model-weights).
+
+### Troubleshooting
+
+- **`api` keeps restarting or is never healthy:** check
+  `docker compose logs api`. A `ValidationError` about a missing field means
+  a `.env` value is still unset; getting killed (exit code 137) means
+  Docker needs more memory.
+- **"port is already allocated":** something else is using 8000, 8501 or
+  8080. Stop it, or change the left-hand port under that service's `ports:`
+  in `docker-compose.yml`.
+- **Ingestion never finishes:** check the `watch_ingest_landing` and
+  `ingest_properties` runs in the Airflow UI; a failed task's log says why.
+- **Chat answers with an error:** check that `GROQ_API_KEY` is valid, then
+  `docker compose up -d` again so the API picks up the change.
+
+### How the images are split
+
+`api` and `ui` are separate images (`src/Dockerfile.api` /
+`src/Dockerfile.ui`). `ui` only needs Streamlit + `requests` (~760MB built,
+vs. `api`'s ~10GB), since it talks to `api` over HTTP and never imports
+torch/langchain itself. The Airflow image is also separate and lighter (no
+PyTorch/LangChain — see [Ingestion Pipeline](#ingestion-pipeline-airflow)
+below). Python dependencies are pinned to exact versions through
+`constraints-api.txt` / `constraints-ui.txt`, so a fresh build gets the same
+stack this was tested with.
 
 ---
 
