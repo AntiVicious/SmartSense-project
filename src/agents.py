@@ -61,8 +61,15 @@ def build_agent_executor(
         description="Use to query the 'properties' table for properties based on price, location, rooms, etc.",
     )
 
+    # content_payload_key must match the payload load_qdrant writes in
+    # dags/ingest_properties_dag.py ({"text": ..., "external_id": ...}) --
+    # LangChain's default, "page_content", finds nothing and every hit
+    # fails Document validation with page_content=None.
     vector_store = Qdrant(
-        client=qdrant_client, collection_name=settings.QDRANT_VECTOR_COLLECTION, embeddings=embedder
+        client=qdrant_client,
+        collection_name=settings.QDRANT_VECTOR_COLLECTION,
+        embeddings=embedder,
+        content_payload_key="text",
     )
     rag_chain = RetrievalQA.from_chain_type(
         llm=llm, chain_type="stuff", retriever=vector_store.as_retriever()

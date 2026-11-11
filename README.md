@@ -172,8 +172,9 @@ docker compose exec api python scripts/backfill_ingest.py data/
 ```
 
 Airflow picks the file up within a minute and runs the pipeline (floorplan
-parsing, embeddings, loading Postgres and Qdrant). That takes a few minutes
-on CPU. You can watch it in the Airflow UI (see below) under the
+parsing, embeddings, loading Postgres and Qdrant). Expect around 15 minutes
+on CPU — parsing all 73 floorplans with YOLOv8 + EasyOCR is the slow part.
+You can watch it in the Airflow UI (see below) under the
 `ingest_properties` DAG. Once its run turns green, ask the chatbot
 something like *"How many listings have 3 bedrooms?"*
 

@@ -19,11 +19,18 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     # --- THIS IS THE FIX (PART 1) ---
     # This tells Docker how to check if Postgres is ready.
+    # -h 127.0.0.1: during first-run initdb the image runs a temporary
+    # server on the Unix socket only, which would pass a socket check
+    # before the real one is up. start_period: that first-run init took
+    # ~95s on a Windows/WSL volume, far past 5 retries x 5s, which failed
+    # `docker compose up` on a fresh clone; checks during start_period
+    # don't count as failures, and a pass ends it early.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 180s
 
   # --- 2. Qdrant Database ---
   qdrant-db:
@@ -113,11 +120,13 @@ services:
       POSTGRES_DB: ${AIRFLOW_POSTGRES_DB}
     volumes:
       - airflow_postgres_data:/var/lib/postgresql/data
+    # Same first-run reasoning as postgres-db's healthcheck above.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_POSTGRES_USER} -d ${AIRFLOW_POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${AIRFLOW_POSTGRES_USER} -d ${AIRFLOW_POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 180s
 
   # --- 5. Airflow: one-shot metadata DB migration + admin user creation.
   # Runs once per `docker compose up`; webserver/scheduler wait for it to
