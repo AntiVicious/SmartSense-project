@@ -1,4 +1,4 @@
-# --- Heavy libraries ---
+# Large ML dependencies, installed in their own Docker layer
 sqlalchemy
 psycopg2-binary
 pandas

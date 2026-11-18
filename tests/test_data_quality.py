@@ -1,8 +1,6 @@
 """
-Tests for src/data_quality.py's check_data_quality() -- extracted from
-dags/ingest_properties_dag.py's validate_data_quality task specifically so
-it's testable without a running Airflow. Needs pandas (already a project
-dependency), nothing else.
+Tests for src/data_quality.check_data_quality(), the logic behind the
+DAG's validate_data_quality task. Runs without Airflow.
 """
 
 import os
@@ -107,9 +105,8 @@ def test_fails_when_image_file_is_null_for_every_row():
 
 
 def test_passes_when_only_some_image_files_are_null():
-    # Individual rows missing an image are a normal, tolerated case
-    # (that row gets skipped downstream) -- only *all* rows missing it
-    # is a data-quality failure.
+    # Some rows without an image are allowed (they're skipped later);
+    # only all rows missing it is a failure.
     df = _good_df(3)
     df.loc[0, "image_file"] = None
     check_data_quality(df, required_columns=REQUIRED_COLUMNS)  # no exception

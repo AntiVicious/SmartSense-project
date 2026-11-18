@@ -1,17 +1,12 @@
 """
-Route-level tests for src/api.py via FastAPI's TestClient. No real
-Postgres, no real Qdrant, no real LLM, no real YOLO/EasyOCR:
+Route tests for src/api.py using FastAPI's TestClient, without Postgres,
+Qdrant, an LLM or the vision models:
 
-- The real lifespan (which builds all of those) is swapped for a no-op
-  before any client is created, so importing/using `app` here never
-  touches app.state via the real startup path.
-- Every Depends accessor (get_app_engine, get_app_qdrant_client, ...)
-  is overridden per test via app.dependency_overrides with a fake, which
-  is how routes get their fakes instead of the real app.state values the
-  (now no-op'd) lifespan would have set.
-- /parse-floorplan-debug has no Depends indirection (parse_floorplan is
-  called directly), so its test replaces src.api.parse_floorplan on the
-  module directly and restores it afterward.
+- The lifespan is replaced with a no-op.
+- Each dependency (get_app_engine, get_app_qdrant_client, ...) is replaced
+  with a fake through app.dependency_overrides.
+- /parse-floorplan-debug calls parse_floorplan directly, so its tests patch
+  src.api.parse_floorplan.
 """
 
 import io
@@ -50,9 +45,8 @@ API_KEY = "test-api-key"
 
 @asynccontextmanager
 async def _noop_lifespan(_app):
-    # Real lifespan builds the engine/Qdrant client/embedder/agent and
-    # would try to reach real infrastructure. Route tests supply their
-    # own fakes via dependency_overrides instead, so startup does nothing.
+    # Tests supply fakes through dependency_overrides, so startup does
+    # nothing.
     yield
 
 
@@ -130,13 +124,9 @@ class FakeAgentExecutor:
 
 
 def _make_session_factory():
-    # StaticPool + check_same_thread=False: routes that use run_in_threadpool
-    # (POST /ingest, GET /ingest/{job_id}) run their DB work in a worker
-    # thread, not the thread that called create_all() below. SQLAlchemy's
-    # default pool for sqlite:///:memory: is thread-scoped (a fresh,
-    # separate in-memory DB per thread), so without this the worker thread
-    # would see an empty database with no tables at all. StaticPool shares
-    # one real connection across every thread instead.
+    # Routes using run_in_threadpool access the database from a worker
+    # thread. In-memory SQLite is per connection, so StaticPool shares one
+    # connection across threads.
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -256,9 +246,7 @@ def test_chat_agent_not_initialized_returns_500():
 
 
 def test_chat_agent_exception_does_not_leak_raw_exception_text():
-    # fix-list 2.4: the client gets a correlation ID, never the exception
-    # itself (which can carry stack frames, connection strings, prompt
-    # content, etc.) -- the real error is only ever logged server-side.
+    # The client gets a correlation ID, never the exception text.
     fake_agent = FakeAgentExecutor(raise_exc=RuntimeError("groq exploded"))
     app.dependency_overrides[get_app_agent_executor] = lambda: fake_agent
     try:
@@ -275,10 +263,8 @@ def test_chat_agent_exception_does_not_leak_raw_exception_text():
 
 
 def test_ingest_route_lands_file_and_creates_queued_job():
-    # /ingest no longer ingests anything itself -- it lands the upload for
-    # the Airflow poller DAG and records a job row. No image_file/rooms/etc
-    # in the payload matters here; that's the DAG's job now, tested in
-    # dags/tests, not this route.
+    # /ingest only saves the upload and records a job row; processing
+    # happens in Airflow.
     session_factory = _make_session_factory()
     landing_dir = tempfile.mkdtemp()
     try:
@@ -321,9 +307,7 @@ def test_ingest_route_lands_file_and_creates_queued_job():
 
 
 def test_ingest_route_rejects_unsupported_file_type():
-    # text/plain isn't in the allowed content-type set, so this is now
-    # rejected by the content-type check before it ever reaches
-    # land_ingest_file's extension check -- same 400, different reason.
+    # Rejected by the content-type check before the extension check.
     session_factory = _make_session_factory()
     landing_dir = tempfile.mkdtemp()
     try:

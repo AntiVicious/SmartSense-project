@@ -4,26 +4,17 @@ import time
 import streamlit as st
 import requests
 
-# The Streamlit UI code
 st.set_page_config(page_title="Real Estate Search", layout="wide")
 st.title("SmartSense Real Estate Search 🏠")
 
-# api and ui are now separate containers/services (fix-list 2.1) -- "localhost"
-# only worked back when uvicorn and Streamlit shared one container. Defaults
-# to the Docker Compose service name; Cloud Run deployment overrides this to
-# the api service's URL.
+# Defaults to the Docker Compose service name; set to the API's URL elsewhere.
 BACKEND_URL = os.environ.get("API_BASE_URL", "http://api:8000")
 
-# Sent as X-API-Key on the write/debug endpoints (POST /ingest and
-# POST /parse-floorplan-debug) -- the api service rejects those without it.
-# The UI is a server-side process, so it can hold this secret safely; it's
-# never sent to the end user's browser.
+# Sent as X-API-Key to POST /ingest and POST /parse-floorplan-debug. Streamlit
+# runs server-side, so the key never reaches the browser.
 API_KEY = os.environ.get("API_KEY", "")
 
-# How long to wait for the backend to come up before declaring it dead.
-# The FastAPI lifespan loads YOLO + EasyOCR + SentenceTransformer + builds
-# the LangChain SQL agent before HTTP starts answering, which is ~20–40s
-# on a cold start.
+# The API loads its models and agent before it responds (~20-40s cold start).
 BACKEND_BOOT_TIMEOUT_SEC = 60
 BACKEND_POLL_INTERVAL_SEC = 1.5
 
@@ -46,21 +37,17 @@ status_placeholder = st.sidebar.empty()
 if "backend_ready" not in st.session_state:
     st.session_state.backend_ready = False
 
-# Fast path: if a previous run already confirmed the backend is up, just do
-# one cheap probe to make sure it's still up. Avoids the 20s wait on every
-# user interaction.
+# If the backend was already up, a single probe is enough.
 if st.session_state.backend_ready:
     ok, msg = _probe_backend()
     if ok:
         status_placeholder.success(f"Backend Connected: {msg}")
     else:
-        # It was up, now it's not. Flip back to unknown and let the slow path
-        # below decide whether it's a blip or a real outage.
+        # Fall through to the polling path below.
         st.session_state.backend_ready = False
 
-# Slow path: backend hasn't been confirmed up yet (cold start, or it just
-# went down). Try once instantly; if that fails, poll with a live status so
-# the user sees "starting up" instead of a misleading "disconnected".
+# Otherwise poll until the backend responds or the timeout passes, showing
+# a "starting up" status meanwhile.
 if not st.session_state.backend_ready:
     ok, msg = _probe_backend()
     if ok:
@@ -80,7 +67,7 @@ if not st.session_state.backend_ready:
                 break
             attempt += 1
         else:
-            # Loop ran to completion without break — give up gracefully.
+            # Timed out
             status_placeholder.error(
                 f"❌ Backend disconnected (no response after "
                 f"{BACKEND_BOOT_TIMEOUT_SEC}s). Last error: {msg}"
@@ -98,9 +85,7 @@ if st.button("Start Ingestion"):
         try:
             with st.spinner("Uploading..."):
                 response = requests.post(f"{BACKEND_URL}/ingest", files=files, headers={"X-API-Key": API_KEY})
-            # /ingest enqueues rather than ingesting inline -- it returns 202
-            # with a job_id, not 200 with a "message" (Airflow does the
-            # actual work; see GET /ingest/{job_id} to poll status).
+            # /ingest queues an Airflow job and returns 202 with a job_id.
             if response.status_code == 202:
                 body = response.json()
                 st.success(f"Queued as job {body['job_id']}. Poll {body['status_url']} for status.")
@@ -111,7 +96,7 @@ if st.button("Start Ingestion"):
     else:
         st.error("Please upload a file first.")
 
-# --- 2. Phase 1 Debug UI ---
+# --- 2. Floorplan parser ---
 st.divider()
 st.header("Floorplan Image Parser")
 uploaded_image = st.file_uploader("Upload a single floorplan image", type=["jpg", "png", "jpeg"])
@@ -154,9 +139,8 @@ if prompt := st.chat_input("Ask me about properties..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Build (user, assistant) history from completed pairs only. This skips any
-    # dangling user message left over from a failed previous turn, and naturally
-    # excludes the just-added new user message at the tail.
+    # Build (user, assistant) history from completed pairs only, skipping
+    # unanswered messages, including the one just added.
     api_history = []
     msgs = st.session_state.messages
     i = 0

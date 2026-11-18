@@ -1,14 +1,11 @@
 """
-Tests for src/floorplan.py's classify_room_label() -- a pure function, no
-YOLO or EasyOCR involved. Exercises the current substring-cascade behavior
-exhaustively, including the known false positives flagged in
-smartsense-fix-list.md's Tier 4 section: "ki" matches "parking", "br"
-matches "library" and "breakfast", and "room" matches "bathroom" but only
-resolves correctly because the bathroom branch runs first. These tests
-pin the *current* (imperfect) behavior deliberately -- they are not meant
-to pass judgment on it. When Tier 4 replaces or fixes the classifier,
-these assertions are expected to need deliberate updates, not silent
-breakage.
+Tests for src/floorplan.classify_room_label() (no YOLO or EasyOCR).
+
+They record the current substring behaviour, including known false
+positives: "ki" matches "parking", "br" matches "library" and "breakfast",
+and "bathroom" is classified correctly only because the bathroom check runs
+before the room check. Fixing the classifier will require updating these
+tests.
 """
 
 import os
@@ -28,8 +25,7 @@ def test_kitchen_matches():
 
 
 def test_kitchen_false_positive_parking():
-    # Documented bug: "parking" contains "ki" (par-KI-ng), so a parking
-    # label gets counted as a kitchen. See fix-list Tier 4.
+    # Known bug: "parking" contains "ki", so it's counted as a kitchen.
     assert classify_room_label("parking") == "kitchens"
 
 
@@ -63,11 +59,8 @@ def test_bathroom_powder_keyword():
 
 
 def test_bathroom_wins_over_room_due_to_branch_order():
-    # Load-bearing ordering, called out explicitly in the fix list:
-    # "bathroom" contains both "bath" and "room". It only resolves to
-    # "bathrooms" because the bathroom elif runs before the room elif.
-    # If these branches were ever reordered, this would silently flip to
-    # "rooms" -- that's exactly what this test guards against.
+    # "bathroom" contains both "bath" and "room"; it's a bathroom only
+    # because that branch runs first. Guards against reordering.
     assert classify_room_label("bathroom") == "bathrooms"
     assert classify_room_label("master bath") == "bathrooms"
 
@@ -84,9 +77,8 @@ def test_hall_liv_keyword():
 
 
 def test_hall_wins_over_room_for_living_room():
-    # "living room" contains both "liv" (hall) and "room" (bedroom); the
-    # hall branch runs first, so it wins -- same ordering dependency as
-    # the bathroom case above, just less obviously a "bug".
+    # "living room" contains "liv" (hall) and "room"; the hall branch runs
+    # first.
     assert classify_room_label("living room") == "halls"
 
 
@@ -117,14 +109,12 @@ def test_bedroom_br_keyword():
 
 
 def test_br_false_positive_library():
-    # Documented bug: "library" contains "br" (li-BR-ary), so it's
-    # counted as a bedroom. See fix-list Tier 4.
+    # Known bug: "library" contains "br", so it's counted as a bedroom.
     assert classify_room_label("library") == "rooms"
 
 
 def test_br_false_positive_breakfast():
-    # Documented bug: "breakfast" contains "br" (BR-eakfast), so it's
-    # counted as a bedroom too.
+    # Known bug: "breakfast" contains "br", so it's counted as a bedroom.
     assert classify_room_label("breakfast") == "rooms"
     assert classify_room_label("breakfast nook") == "rooms"
 
@@ -142,12 +132,8 @@ def test_others_for_empty_string():
 
 
 def test_uppercase_input_is_not_matched():
-    # classify_room_label does no case-folding itself -- it's documented
-    # (and relied on by parse_floorplan) to receive already-lowercased
-    # text. Uppercase "KITCHEN" doesn't contain lowercase "ki", so it
-    # falls through to "others". This pins that contract: if someone
-    # removes the .lower() call in parse_floorplan, classification
-    # silently degrades to "others" for everything rather than raising.
+    # The function expects lowercase input (parse_floorplan lowercases it),
+    # so uppercase text falls through to "others".
     assert classify_room_label("KITCHEN") == "others"
 
 

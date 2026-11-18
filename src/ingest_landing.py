@@ -1,7 +1,7 @@
-"""File-landing + job-row creation, shared between POST /ingest and the
-backfill script (scripts/backfill_ingest.py). Needs SQLAlchemy and the
-IngestJob model, so unlike ingest_support.py this is only ever run from
-the app's own environment -- never imported by the Airflow DAGs.
+"""Saves uploaded spreadsheets for ingestion and creates their job rows.
+
+Used by POST /ingest and scripts/backfill_ingest.py; not imported by the
+Airflow DAGs.
 """
 
 import os
@@ -25,11 +25,8 @@ def land_ingest_file(
     """Writes file_bytes to <landing_dir>/<job_id><suffix> and inserts a
     'queued' IngestJob row. Returns the new job_id.
 
-    The Airflow poller DAG (dags/watch_ingest_landing_dag.py) watches
-    landing_dir and picks up files by job_id, not by original filename --
-    job_id is server-generated (uuid4), so the destination path never
-    incorporates client-supplied input (same reasoning as the
-    /parse-floorplan-debug path-traversal fix).
+    The file is named by the generated job_id, never the client's filename,
+    and is picked up by dags/watch_ingest_landing_dag.py.
     """
     suffix = Path(original_filename or "").suffix.lower()
     if suffix not in ALLOWED_SUFFIXES:
@@ -37,8 +34,7 @@ def land_ingest_file(
 
     job_id = str(uuid.uuid4())
 
-    # World-writable: the Airflow poller (a different container, a
-    # different UID) has to be able to rename files out of this directory.
+    # Airflow runs as a different user and must be able to move files out.
     ensure_shared_dir(landing_dir)
     dest_path = os.path.join(landing_dir, f"{job_id}{suffix}")
     with open(dest_path, "wb") as f:

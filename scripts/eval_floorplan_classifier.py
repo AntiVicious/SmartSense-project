@@ -1,27 +1,19 @@
 #!/usr/bin/env python
-"""Measures src/floorplan.py's classify_room_label() against real detections
-on a held-out split of data/images/ -- Tier 4 in smartsense-fix-list.md.
+"""Evaluates src/floorplan.py's classify_room_label() on detections from
+data/images/.
 
 Two subcommands, run in sequence:
 
-  extract   Splits the image pool into a held-out eval set and a dev
-            remainder (fixed seed, so the split is reproducible), runs the
-            *real* YOLO + EasyOCR pipeline over the eval set only, and
-            writes one row per detected room_name box to a CSV -- OCR
-            text, this repo's actual classify_room_label() prediction,
-            and an empty ground_truth_class column for a human to fill in
-            by looking at the saved crop.
+  extract   Selects an evaluation set with a fixed seed, runs the YOLO +
+            EasyOCR pipeline on it, and writes one CSV row per detected box:
+            OCR text, the classifier's prediction, and an empty
+            ground_truth_class column to label by hand from the saved crop.
 
-  score     Reads that CSV back (after ground_truth_class has been filled
-            in by hand) and computes the confusion matrix and per-class
-            precision/recall, each number next to its support count.
+  score     Reads the labelled CSV and reports the confusion matrix and
+            per-class precision and recall with support counts.
 
-Deliberately calls the real classify_room_label() from src.floorplan
-rather than reimplementing the substring rules here -- this measures the
-shipped classifier, not a description of it. YOLO detection and OCR are
-also the real pipeline (same imgsz/conf/cleaning as parse_floorplan), so
-the eval reflects what the deployed pipeline actually sees, OCR noise
-included, not hand-typed clean labels.
+It uses the same detection settings, OCR and text cleaning as
+parse_floorplan, and imports classify_room_label() directly.
 
 Usage:
     python scripts/eval_floorplan_classifier.py extract \\

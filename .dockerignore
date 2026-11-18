@@ -1,5 +1,4 @@
-# Version control (this alone can be large — history includes the
-# committed model weights)
+# Version control
 .git
 .github
 .gitignore
@@ -12,10 +11,8 @@ tests/
 *.md
 requirements-dev.txt
 setup.cfg
-smartsense-fix-list.md
 
-# Model weights are fetched from a GitHub release at build time (see
-# src/Dockerfile) — never bake in whatever happens to be on disk locally.
+# Model weights are downloaded at build time (see src/Dockerfile.api).
 src/*.pt
 
 # Python

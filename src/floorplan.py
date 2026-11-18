@@ -1,9 +1,7 @@
 """Floorplan parsing: YOLO room-box detection + EasyOCR text classification.
 
-The YOLO and EasyOCR models are lazy-loaded module-level singletons, same
-as before the split — the first call to parse_floorplan() loads them, every
-call after that reuses them. Nothing here touches disk or a model at
-import time.
+The YOLO and EasyOCR models are loaded on the first call to
+parse_floorplan() and reused afterwards.
 """
 
 import logging
@@ -27,16 +25,11 @@ _ocr_reader = None  # Lazy-load the OCR model
 def prepare_ocr_crop(img_pil: Image.Image, x1: int, y1: int, x2: int, y2: int) -> np.ndarray:
     """Pads and upscales a detected room_name box before handing it to OCR.
 
-    eval/REPORT.md's held-out measurement of classify_room_label found
-    that *every* one of its real-category misclassifications traced back
-    to OCR returning empty or corrupted text, not to the substring rules
-    -- and that this tracked crop size: boxes OCR failed on averaged
-    28x14px, versus 57x17px for boxes it read successfully, and crops
-    that failed were confirmed by eye to contain perfectly legible text
-    (e.g. "DINING", "BATH") at 5x upscale. This is that fix: pad the box
-    by 15% a side (a tight YOLO box can clip a character's edge) and
-    upscale so the crop is at least MIN_HEIGHT tall, capped at MAX_SCALE
-    to avoid blowing up already-adequate crops into blur.
+    OCR failures were concentrated in small boxes (about 28x14px on average,
+    against 57x17px for boxes read correctly), even when the text was legible.
+    The box is padded by 15% on each side, since tight boxes can clip
+    characters, and upscaled to at least MIN_HEIGHT pixels tall, up to
+    MAX_SCALE. See eval/REPORT.md for the effect.
     """
     MIN_HEIGHT = 48
     MAX_SCALE = 6
@@ -63,18 +56,13 @@ def prepare_ocr_crop(img_pil: Image.Image, x1: int, y1: int, x2: int, y2: int) -
 def classify_room_label(detected_text: str) -> str:
     """Classify a cleaned OCR label into one of the room-count buckets.
 
-    detected_text must already be lowercased and stripped down to letters
-    and whitespace (see the re.sub call in parse_floorplan below) -- this
-    function does no cleaning itself, matching how the classification was
-    always invoked inline before it was pulled out as its own function.
+    detected_text must already be lowercased and contain only letters and
+    spaces (parse_floorplan does this cleaning).
 
-    Branch order is significant, not just style: "bathroom" contains both
-    "bath" and "room", and only resolves to "bathrooms" because the
-    bathroom check runs before the room check. Several of these substring
-    checks also false-positive on unrelated words -- "ki" matches
-    "parking", "br" matches "library" and "breakfast" -- see the tests in
-    tests/test_floorplan_classification.py, which document the current
-    (imperfect) behavior rather than silently rely on it.
+    Branch order matters: "bathroom" contains both "bath" and "room" and is
+    classified as a bathroom only because that check runs first. Some
+    substrings also match unrelated words ("ki" in "parking", "br" in
+    "library"); tests/test_floorplan_classification.py documents these.
     """
     if "ki" in detected_text:
         return "kitchens"
@@ -89,7 +77,7 @@ def classify_room_label(detected_text: str) -> str:
     elif "hall" in detected_text or "liv" in detected_text or "great" in detected_text:
         return "halls"
     elif "bed" in detected_text or "room" in detected_text or "br" in detected_text:
-        # This is a general "room", e.g., bedroom
+        # Bedrooms and other rooms
         return "rooms"
     else:
         return "others"

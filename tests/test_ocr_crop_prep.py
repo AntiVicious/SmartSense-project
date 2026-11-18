@@ -1,9 +1,6 @@
 """
-Tests for src/floorplan.py's prepare_ocr_crop() -- the padding/upscaling
-step added after eval/REPORT.md found that undersized crops (not the
-substring rules) accounted for 100% of the classifier's real-category
-misclassifications in its held-out measurement. Pure PIL/numpy, no YOLO
-or EasyOCR involved.
+Tests for src/floorplan.prepare_ocr_crop(), which pads and upscales
+detected boxes before OCR (see eval/REPORT.md). No YOLO or EasyOCR.
 """
 
 import os

@@ -32,10 +32,8 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             requirements-heavy.txt
-      # The app imports YOLO/EasyOCR (via opencv) at module scope in
-      # src/floorplan.py, so even importing the modules under test --
-      # let alone running them -- needs these system libs, same as the
-      # Dockerfile's apt-get step.
+      # src/floorplan.py imports OpenCV-based libraries, which need these
+      # system packages (as in src/Dockerfile.api).
       - name: Install system dependencies
         run: |
           sudo apt-get update

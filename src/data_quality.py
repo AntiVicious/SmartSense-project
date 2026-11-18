@@ -1,23 +1,15 @@
 """Data-quality checks for the ingest pipeline's raw spreadsheet.
 
-Runs as its own Airflow task (dags/ingest_properties_dag.py's
-validate_data_quality) between extract and transform, so bad data fails
-loudly before any per-row processing -- floorplan parsing, embeddings --
-is wasted on it.
-
-Needs pandas, so unlike src.ingest_support this isn't stdlib-only -- but
-pandas is already a dependency on both sides (requirements-heavy.txt for
-the app, requirements-airflow.txt for Airflow), so this doesn't add
-anything new to either.
+Runs as the validate_data_quality task in dags/ingest_properties_dag.py,
+before floorplan parsing and embedding, so bad input fails early.
 """
 
 import pandas as pd
 
 
 class DataQualityError(ValueError):
-    """Raised on the first check that fails. The DAG task wraps this as
-    an AirflowFailException so it isn't retried -- a data problem isn't
-    fixed by retrying."""
+    """Raised on the first failed check. The DAG converts it to an
+    AirflowFailException so the task isn't retried."""
 
 
 def check_data_quality(

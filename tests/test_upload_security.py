@@ -1,20 +1,9 @@
 """
-Regression test for the path-traversal fix in /parse-floorplan-debug
-(smartsense-fix-list.md Tier 0.2).
+Path-traversal tests for /parse-floorplan-debug.
 
-The original code did:
-
-    file_path = f"/tmp/{file.filename}"
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
-
-file.filename is attacker-controlled -- a filename like
-"../../app/api.py" would resolve outside /tmp entirely and could
-overwrite application code. The fix (src/api.py's
-parse_floorplan_debug) writes to a tempfile.mkstemp()-generated path
-and never reads file.filename at all. These tests fail loudly if that
-regresses -- e.g. if someone "simplifies" the upload handling back to
-using the client-supplied filename.
+The client controls file.filename, so a name like "../../app/api.py" must
+never be used as a path. The endpoint writes to a tempfile.mkstemp() path
+instead; these tests fail if the filename ever reaches the write path.
 """
 
 import os
@@ -52,9 +41,8 @@ class FakeSettings:
         return self.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 
-# Every test in this file hits /parse-floorplan-debug, which now depends on
-# get_app_settings (for the API key check and the upload size limit) --
-# override it once, module-wide, rather than per test.
+# /parse-floorplan-debug needs settings for the API key and size limit;
+# override them once for the whole module.
 app.dependency_overrides[get_app_settings] = lambda: FakeSettings()
 
 
@@ -64,9 +52,7 @@ def test_malicious_filename_never_reaches_the_filesystem_path():
 
     def fake_parse_floorplan(path):
         captured["path"] = path
-        # The file must exist at this point (written before parsing,
-        # not yet cleaned up) -- proves the write-then-parse ordering,
-        # not just that *some* path string was passed.
+        # The file exists during parsing (written first, removed after).
         captured["existed_during_parse"] = os.path.exists(path)
         return {"rooms": 0, "halls": 0, "kitchens": 0, "bathrooms": 0, "other rooms": 0}
 
@@ -82,25 +68,21 @@ def test_malicious_filename_never_reaches_the_filesystem_path():
         assert resp.status_code == 200
         actual_path = captured["path"]
 
-        # The old code (file_path = f"/tmp/{file.filename}") would have
-        # produced a path containing "../../../../" here, resolving
-        # outside /tmp. The fix must never do that.
+        # The path must not contain the client-supplied "../" segments.
         assert ".." not in actual_path
         assert not actual_path.endswith("evil_traversal_marker.jpg")
         assert os.path.dirname(actual_path) == "/tmp"
         assert captured["existed_during_parse"] is True
 
-        # And it's cleaned up afterward.
+        # Removed afterwards
         assert not os.path.exists(actual_path)
     finally:
         api_module.parse_floorplan = original_parse_floorplan
 
 
 def test_filename_with_null_byte_and_path_separators_never_reaches_the_path():
-    # A second, differently-shaped malicious filename -- absolute path
-    # plus characters that have historically been used to confuse naive
-    # path handling. Same assertions: none of it should surface in the
-    # path actually written to.
+    # An absolute path with unusual characters must not reach the write
+    # path either.
     original_parse_floorplan = api_module.parse_floorplan
     captured = {}
 
@@ -127,9 +109,7 @@ def test_filename_with_null_byte_and_path_separators_never_reaches_the_path():
 
 
 def test_temp_file_is_cleaned_up_even_if_parsing_fails():
-    # The finally: os.remove(file_path) block must run regardless of
-    # whether parsing succeeds -- otherwise every failed upload leaks a
-    # temp file into /tmp for the life of the container.
+    # The temp file must be removed even when parsing fails.
     original_parse_floorplan = api_module.parse_floorplan
     captured = {}
 
@@ -139,10 +119,8 @@ def test_temp_file_is_cleaned_up_even_if_parsing_fails():
 
     api_module.parse_floorplan = failing_parse_floorplan
     try:
-        # raise_server_exceptions=False: the route doesn't catch parser
-        # errors, so without this the exception propagates straight into
-        # the test process instead of becoming the 500 response a real
-        # client over HTTP would actually see.
+        # Return the 500 response instead of raising the parser error in
+        # the test.
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.post(
                 "/parse-floorplan-debug",

@@ -13,7 +13,7 @@ __pycache__/
 venv/
 env/
 
-# Model weights (best_1000.pt is intentionally tracked — see README)
+# Model weights (published as a GitHub release asset, see README)
 *.pt
 
 # Jupyter
@@ -23,7 +23,7 @@ env/
 .coverage
 htmlcov/
 
-# Ingest pipeline runtime dirs -- not part of the tracked sample dataset
+# Ingestion runtime directories
 data/_incoming/
 data/_staging/
 

@@ -4,9 +4,7 @@ services:
     image: postgres:15-alpine
     container_name: postgres-db
     restart: always
-    # Not published to the host (fix-list 2.7) -- only other containers on
-    # this Compose network need to reach it; `expose` documents the port
-    # without binding it to the host interface the way `ports` does.
+    # Reachable only from other containers on this network, not the host.
     expose:
       - "5432"
     env_file:
@@ -17,14 +15,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    # --- THIS IS THE FIX (PART 1) ---
-    # This tells Docker how to check if Postgres is ready.
-    # -h 127.0.0.1: during first-run initdb the image runs a temporary
-    # server on the Unix socket only, which would pass a socket check
-    # before the real one is up. start_period: that first-run init took
-    # ~95s on a Windows/WSL volume, far past 5 retries x 5s, which failed
-    # `docker compose up` on a fresh clone; checks during start_period
-    # don't count as failures, and a pass ends it early.
+    # Check over TCP (-h 127.0.0.1): during first-run initialisation Postgres
+    # runs a temporary socket-only server that would pass a socket check too
+    # early. First-run initialisation can take ~95s on Windows/WSL volumes,
+    # hence the long start_period.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -37,20 +31,15 @@ services:
     image: qdrant/qdrant:latest
     container_name: qdrant-db
     restart: always
-    # Not published to the host -- see postgres-db above.
+    # Reachable only from other containers on this network.
     expose:
       - "6333"
       - "6334"
     volumes:
       - qdrant_data:/qdrant/storage
-    # (Qdrant also has a healthcheck, but we don't need it yet)
 
   # --- 3. The API (FastAPI backend) ---
-  # One process per container (fix-list 2.1): previously run.sh backgrounded
-  # uvicorn and foregrounded Streamlit in a single container, so a dead
-  # backend didn't stop the container from looking "up". api and ui are now
-  # independent services with their own healthchecks -- see src/Dockerfile.api
-  # and src/Dockerfile.ui.
+  # api and ui run as separate services, each with its own healthcheck.
   api:
     build:
       context: .
@@ -68,15 +57,11 @@ services:
         condition: service_started # Qdrant starts fast, this is fine
     volumes:
       - ./data:/app/data
-      # Not baked into the image (it's an occasional operational script,
-      # not app code) -- mounted read-only instead, matching how the
-      # Airflow containers below mount ./src:ro.
+      # Operational scripts, mounted read-only rather than built into the image.
       - ./scripts:/app/scripts:ro
     healthcheck:
-      # No curl in python:3.10-slim -- urllib is stdlib, so this needs no
-      # extra package. start_period is long because lifespan loads
-      # YOLO + EasyOCR + SentenceTransformer and builds the LangChain agent
-      # before /health can answer at all (cold start, ~20-40s).
+      # Uses urllib because the slim image has no curl. Startup loads the
+      # models and agent before /health responds (~20-40s).
       test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=3)"]
       interval: 15s
       timeout: 5s
@@ -105,9 +90,7 @@ services:
       retries: 5
       start_period: 30s
 
-  # --- 4. Airflow metadata DB -- deliberately separate from postgres-db
-  # above. Airflow's own migrations/restarts shouldn't touch the app's
-  # database, and vice versa. ---
+  # --- 4. Airflow metadata DB, kept separate from the app database ---
   airflow-postgres:
     image: postgres:15-alpine
     container_name: airflow-postgres
@@ -120,7 +103,7 @@ services:
       POSTGRES_DB: ${AIRFLOW_POSTGRES_DB}
     volumes:
       - airflow_postgres_data:/var/lib/postgresql/data
-    # Same first-run reasoning as postgres-db's healthcheck above.
+    # Same healthcheck settings as postgres-db.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${AIRFLOW_POSTGRES_USER} -d ${AIRFLOW_POSTGRES_DB}"]
       interval: 5s
@@ -128,9 +111,8 @@ services:
       retries: 5
       start_period: 180s
 
-  # --- 5. Airflow: one-shot metadata DB migration + admin user creation.
-  # Runs once per `docker compose up`; webserver/scheduler wait for it to
-  # exit 0 (service_completed_successfully) before starting. ---
+  # --- 5. Airflow init: migrates the metadata DB and creates the admin
+  # user. The webserver and scheduler start after it exits successfully. ---
   airflow-init:
     build:
       context: .
@@ -146,16 +128,11 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres/${AIRFLOW_POSTGRES_DB}
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      # Airflow's default pauses every new DAG, so on a fresh clone uploads
-      # would land in data/_incoming/ and never be picked up until someone
-      # unpaused both DAGs by hand in the UI.
+      # Start DAGs unpaused so uploads are processed on a fresh install.
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
       AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
-      # Airflow Connections -- read via BaseHook.get_connection() in
-      # dags/support.py, never os.environ directly in DAG code. This is
-      # the framework's own documented mechanism for seeding Connections
-      # in a container, not the thing that instruction is steering away
-      # from.
+      # Airflow Connections, read in dags/support.py with
+      # BaseHook.get_connection().
       AIRFLOW_CONN_SMARTSENSE_POSTGRES: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}
       AIRFLOW_CONN_SMARTSENSE_QDRANT: http://qdrant-db:6333
       AIRFLOW_CONN_SMARTSENSE_INTERNAL_API: >-
@@ -201,8 +178,7 @@ services:
       - ./src:/opt/airflow/src:ro
     command: webserver
 
-  # --- 7. Airflow scheduler (LocalExecutor -- runs tasks as its own
-  # subprocesses, no separate worker service needed at this scale) ---
+  # --- 7. Airflow scheduler (LocalExecutor, no separate workers) ---
   airflow-scheduler:
     build:
       context: .
@@ -223,12 +199,9 @@ services:
       - ./src:/opt/airflow/src:ro
     command: scheduler
 
-  # --- 7. Public tunnel -- opt-in, only with `docker compose --profile
-  # public up -d`. A Cloudflare quick tunnel: outbound-only (no router
-  # ports opened), no Cloudflare account needed. Only the ui is exposed;
-  # api, the databases and Airflow stay on this Compose network. The
-  # https://<random>.trycloudflare.com URL is printed in this service's
-  # logs and changes every time the container restarts. ---
+  # --- 8. Optional Cloudflare quick tunnel (`docker compose --profile
+  # public up -d`). Exposes only the ui; the temporary trycloudflare.com URL
+  # is printed in this service's logs and changes on every restart. ---
   tunnel:
     image: cloudflare/cloudflared:2024.12.2
     container_name: tunnel
@@ -239,7 +212,7 @@ services:
       ui:
         condition: service_healthy
 
-# --- Define the persistent volumes ---
+# --- Persistent volumes ---
 volumes:
   postgres_data:
   qdrant_data:

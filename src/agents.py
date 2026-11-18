@@ -1,9 +1,7 @@
 """Tool definitions and LangChain agent assembly.
 
-build_agent_executor() takes already-constructed clients (engine, Qdrant
-client, embedder, session factory) and settings, and returns the assembled
-AgentExecutor — it does no client construction itself, so it has no import-
-time or hidden side effects. It's called once from api.py's lifespan.
+build_agent_executor() takes existing clients and settings and returns the
+AgentExecutor. It is called once from api.py's lifespan.
 """
 
 import logging
@@ -45,11 +43,8 @@ def build_agent_executor(
 ) -> AgentExecutor:
     llm = ChatGroq(model=settings.LLM_MODEL_NAME, temperature=0, api_key=settings.GROQ_API_KEY)
 
-    # verbose=True makes LangChain print its full reasoning trace (prompts,
-    # intermediate tool calls, raw LLM output) to stdout on every request --
-    # useful while developing, a logging/cost liability left on by default in
-    # production. Tied to LOG_LEVEL rather than a separate setting: if you've
-    # turned on DEBUG logging you also want this (fix-list 2.3).
+    # LangChain's verbose mode prints full prompts and tool calls, so it is
+    # enabled only at DEBUG log level.
     verbose = settings.LOG_LEVEL.upper() == "DEBUG"
 
     db = SQLDatabase(engine, include_tables=["properties"])
@@ -61,10 +56,9 @@ def build_agent_executor(
         description="Use to query the 'properties' table for properties based on price, location, rooms, etc.",
     )
 
-    # content_payload_key must match the payload load_qdrant writes in
-    # dags/ingest_properties_dag.py ({"text": ..., "external_id": ...}) --
-    # LangChain's default, "page_content", finds nothing and every hit
-    # fails Document validation with page_content=None.
+    # content_payload_key must match the "text" payload field written by
+    # load_qdrant in dags/ingest_properties_dag.py (LangChain's default is
+    # "page_content").
     vector_store = Qdrant(
         client=qdrant_client,
         collection_name=settings.QDRANT_VECTOR_COLLECTION,
@@ -99,7 +93,7 @@ def build_agent_executor(
         logger.info("Report generation agent triggered")
         db = session_factory()
         try:
-            # Build the query dynamically based on provided arguments
+            # Add a filter for each provided argument
             query = db.query(Property)
             filters = []
 
@@ -120,7 +114,7 @@ def build_agent_executor(
             if not properties:
                 return "I found no properties matching those criteria."
 
-            # --- Create a Markdown report string ---
+            # Build a Markdown report
             report = "# Property Report\n\n"
             report += f"I found {len(properties)} properties matching your criteria.\n\n---\n\n"
 
@@ -149,7 +143,7 @@ def build_agent_executor(
         finally:
             db.close()
 
-    # --- Assemble Agent ---
+    # Assemble the agent
     tools = [sql_search_tool, rag_search_tool, generate_property_report]
 
     prompt = ChatPromptTemplate.from_messages(

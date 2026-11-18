@@ -1,6 +1,5 @@
-"""Alembic environment. Reads the DB URL from src.config.Settings (same
-Settings the app uses) instead of duplicating credentials into alembic.ini
-or a separate env var lookup."""
+"""Alembic environment. Reads the database URL from src.config.Settings, so
+credentials aren't duplicated in alembic.ini."""
 
 import os
 import sys

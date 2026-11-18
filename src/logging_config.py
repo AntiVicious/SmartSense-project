@@ -1,10 +1,8 @@
 """Structured logging setup, called once from api.py's lifespan before
 anything else logs.
 
-Emits one JSON line per record with a "severity" key -- Cloud Logging's
-structured-logging convention for stdout/stderr. Without it, Cloud Run
-ingests every line as INFO regardless of actual level, which defeats the
-point of having levels at all once this is actually deployed there.
+Emits one JSON line per record with a "severity" key, which Cloud Logging
+uses to assign log levels to stdout/stderr output.
 """
 
 import json
@@ -39,8 +37,6 @@ def configure_logging(level: str = "INFO") -> None:
     root.handlers = [handler]
     root.setLevel(level.upper())
 
-    # These libraries log a lot at INFO/DEBUG (HTTP client internals, model
-    # loading progress bars re-logged as lines, etc.) that's noise here even
-    # when our own code is at DEBUG -- cap them at WARNING regardless.
+    # Keep noisy third-party libraries at WARNING.
     for noisy_logger in ("httpx", "httpcore", "urllib3"):
         logging.getLogger(noisy_logger).setLevel(logging.WARNING)

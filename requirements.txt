@@ -1,15 +1,14 @@
-# --- Light libraries ---
+# API dependencies
 fastapi
 uvicorn[standard]
 pydantic-settings>=2.0,<3
 alembic>=1.13,<2
-# Pin: langchain-community 0.0.34 (below) calls QdrantClient.search(),
-# which was removed in qdrant-client 1.12+. Stay on the 1.7–1.11 range.
+# langchain-community 0.0.34 uses QdrantClient.search(), removed in
+# qdrant-client 1.12.
 qdrant-client>=1.7,<1.12
 python-multipart
 
-# --- For LangChain Agents (Phase 3) ---
-# Pinned versions for stability
+# LangChain (pinned)
 langchain==0.1.16
 langchain-core==0.1.45
 langchain-community==0.0.34
