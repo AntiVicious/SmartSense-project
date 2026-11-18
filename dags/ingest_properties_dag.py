@@ -1,32 +1,22 @@
 """Property ingestion pipeline: Excel -> Postgres + Qdrant.
 
-Triggered by dags/watch_ingest_landing_dag.py when a file lands in
-INGEST_LANDING_DIR -- not on a schedule (schedule=None). dag_run.conf
-carries {"spreadsheet_path": ..., "job_id": ...}.
+Triggered by dags/watch_ingest_landing_dag.py for each landed file
+(no schedule). dag_run.conf carries {"spreadsheet_path": ..., "job_id": ...}.
 
-Idempotent by construction: every row gets a stable external_id (a
-listing_id column from the spreadsheet if present, otherwise a
-deterministic hash of title/location/image_file -- see
-src.ingest_support), and both the Postgres and Qdrant writes are upserts
-keyed by it, never a blind insert. Re-running this DAG on the same file
-(including via backfill, including after a partial failure) never
-duplicates a row -- fix-list item 2.2.
+Idempotency: each row gets a stable external_id (the spreadsheet's
+listing_id, or a hash of title, location and image file; see
+src.ingest_support), and both Postgres and Qdrant writes are upserts keyed
+by it, so re-running a file never duplicates rows.
 
-Ordering fixes the other half of 2.2: load_qdrant runs before
-load_postgres. If the Qdrant upsert fails and exhausts its retries, no
-Postgres row is written for this run at all -- no more rows with no
-vector. verify_load is the hard backstop regardless: it checks that
-every staged external_id actually exists in *both* stores by identity
-(not just that the counts match) and fails the DAG if not.
+Write order: load_qdrant runs before load_postgres, so a Qdrant failure
+never leaves a Postgres row without a vector. verify_load then checks that
+every staged external_id exists in both stores and fails the DAG if not.
 
-No DataFrames through XCom: each task writes its output to a Parquet
-file under a per-job staging directory and passes only that path (plus
-small scalars) through XCom.
+Tasks exchange Parquet file paths through XCom, not DataFrames.
 
-Floorplan parsing and embedding computation call this app's
-/internal/parse-floorplan and /internal/embed instead of running
-in-process -- this image carries no torch, deliberately (see
-requirements-airflow.txt).
+Floorplan parsing and embeddings are delegated to the API's
+/internal/parse-floorplan and /internal/embed endpoints, so this image
+doesn't need PyTorch.
 """
 
 import os
@@ -94,12 +84,8 @@ def _on_dag_success(context):
 
 
 def _on_task_failure(context):
-    # Deliberately a *task*-level callback (wired in via default_args
-    # below), not the DAG-level on_failure_callback -- context["exception"]
-    # is only reliably populated at task granularity. A DAG-level failure
-    # callback's context doesn't carry the originating task's exception,
-    # so it can't do better than "something failed" -- this can name what
-    # and why.
+    # Task-level callback (set in default_args): only task callbacks receive
+    # the exception, so the job row can record which task failed and why.
     job_id = (context["dag_run"].conf or {}).get("job_id")
     exception = context.get("exception")
     task_id = context["task_instance"].task_id
@@ -146,7 +132,7 @@ def ingest_properties():
         print(f"Extracted {len(df)} rows from {spreadsheet_path}")
         return {"staging_path": staging_path, "job_id": job_id}
 
-    @task(retries=0)  # a data-quality failure isn't fixed by retrying
+    @task(retries=0)  # retrying doesn't fix bad data
     def validate_data_quality(extract_result: dict) -> dict:
         import pandas as pd
 

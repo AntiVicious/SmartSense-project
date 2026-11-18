@@ -1,15 +1,12 @@
-"""FastAPI app: routes and startup wiring only.
+"""FastAPI app: routes and startup wiring.
 
-All client construction is lazy and lives in db.py; all business logic
-lives in floorplan.py, documents.py, agents.py. lifespan builds each
-client exactly once at startup and stores it on app.state; routes pull
-what they need via Depends, which just reads app.state.
+Clients are created in db.py and business logic lives in floorplan.py,
+documents.py and agents.py. lifespan builds each client once and stores it
+on app.state; routes receive them through Depends.
 
-Property ingestion itself runs as an Airflow DAG (dags/), not inline in a
-request handler -- POST /ingest only lands the uploaded file and creates
-an ingest_jobs row; GET /ingest/{job_id} reads that row back. The
-/internal/* endpoints are how the DAG reaches the already-loaded
-YOLO/EasyOCR/embedding models without Airflow's own image needing torch.
+Ingestion runs as an Airflow DAG: POST /ingest saves the file and creates an
+ingest_jobs row, and GET /ingest/{job_id} reads its status. The DAG calls
+the /internal/* endpoints to use the models loaded here.
 """
 
 import logging
@@ -37,13 +34,9 @@ from .models import ChatRequest, InternalEmbedRequest, InternalParseFloorplanReq
 logger = logging.getLogger(__name__)
 
 
-# -----------------------------------------------------------------
-# --- THE LIFESPAN FIX ---
-# We initialize all DB-dependent agents inside this startup event
-# -----------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # This code runs ONCE, when the app starts up
+    """Builds database clients, the embedder and the agent once at startup."""
     settings = get_settings()
     configure_logging(settings.LOG_LEVEL)
     logger.info("FastAPI is starting up, waiting for databases...")
@@ -53,7 +46,7 @@ async def lifespan(app: FastAPI):
     embedder = get_embedder()
     session_factory = get_session_factory()
 
-    # 1. Create Qdrant Collection (idempotent — do NOT wipe data on restart)
+    # Create the Qdrant collection if it doesn't exist; keep existing data.
     existing = {c.name for c in qdrant_client.get_collections().collections}
     if settings.QDRANT_VECTOR_COLLECTION in existing:
         logger.info("Qdrant collection '%s' already exists. Reusing.", settings.QDRANT_VECTOR_COLLECTION)
@@ -65,11 +58,11 @@ async def lifespan(app: FastAPI):
         )
         logger.info("Qdrant collection '%s' created.", settings.QDRANT_VECTOR_COLLECTION)
 
-    # 2. Create PostgreSQL Tables
+    # Create PostgreSQL tables
     Base.metadata.create_all(bind=engine)
     logger.info("Tables created successfully.")
 
-    # 3. Initialize ALL database-dependent agents
+    # Build the agent
     logger.info("Initializing agents...")
     agent_executor = build_agent_executor(
         engine=engine,
@@ -97,7 +90,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Real-Estate API", lifespan=lifespan)
 
 
-# --- Dependencies: just read what lifespan stored on app.state ---
+# --- Dependencies: read the objects lifespan stored on app.state ---
 def get_app_settings(request: Request) -> Settings:
     return request.app.state.settings
 
@@ -126,10 +119,7 @@ def verify_internal_api_key(
     x_internal_api_key: str = Header(default=""),
     settings: Settings = Depends(get_app_settings),
 ):
-    """Gate for /internal/*. These run real inference on request and are
-    reachable by anything on the Docker network (the port isn't published
-    to the host, but that's not the same as authenticated) -- this is the
-    shared secret Airflow's Connection for the internal API carries."""
+    """Checks the shared secret Airflow sends to /internal/* endpoints."""
     if not x_internal_api_key or x_internal_api_key != settings.INTERNAL_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing internal API key")
 
@@ -138,22 +128,15 @@ def verify_api_key(
     x_api_key: str = Header(default=""),
     settings: Settings = Depends(get_app_settings),
 ):
-    """Gate for the public write/debug endpoints: POST /ingest and
-    POST /parse-floorplan-debug (fix-list 2.6). A static shared-secret
-    header is a deliberately minimal answer -- enough that this isn't an
-    open write path into the database or a free-to-abuse inference
-    endpoint once this is on a billed Cloud Run service, not a full auth
-    system this project doesn't otherwise have. The ui service holds this
-    key server-side (see src/main.py) and attaches it on the user's behalf."""
+    """Checks the API key for POST /ingest and POST /parse-floorplan-debug.
+
+    The ui service holds the key server-side and sends it on the user's
+    behalf."""
     if not x_api_key or x_api_key != settings.API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
-# --- Upload validation (fix-list 2.5) ---
-# Both upload endpoints used to call `await file.read()` with no size
-# limit and no content-type check -- one large upload could OOM the
-# container, and nothing stopped an arbitrary file from being handed to
-# pandas/PIL/YOLO.
+# --- Upload validation: content type and size limits ---
 
 _ALLOWED_SPREADSHEET_CONTENT_TYPES = {
     "",  # some browsers/clients omit it for less-common extensions
@@ -166,9 +149,8 @@ _ALLOWED_SPREADSHEET_CONTENT_TYPES = {
 
 
 async def _read_upload_or_413(file: UploadFile, settings: Settings) -> bytes:
-    """Reads at most max_upload_size_bytes + 1 bytes -- enough to detect
-    an oversized upload without ever buffering more than that much in
-    memory, regardless of what (or whether) Content-Length claims."""
+    """Reads at most max_upload_size_bytes + 1 bytes, so an oversized upload
+    is rejected without buffering it, whatever Content-Length says."""
     max_bytes = settings.max_upload_size_bytes
     contents = await file.read(max_bytes + 1)
     if len(contents) > max_bytes:
@@ -251,18 +233,12 @@ async def chat_endpoint(request: ChatRequest, agent_executor=Depends(get_app_age
 
     agent_input = request.query
     try:
-        # Run agent
         response = await agent_executor.ainvoke({"input": agent_input, "chat_history": chat_history})
         return {"status": "success", "response": response["output"]}
     except GroqBadRequestError as e:
-        # Groq's tool-call validator rejects `null` argument values outright
-        # (schema says e.g. "type": "string", and langchain's generated
-        # tool schema never marks it nullable even for Optional[...]
-        # params) -- but the model reaches for null specifically on vague
-        # queries ("show me anything"), which is a normal, expected input,
-        # not a real error. One retry with an explicit nudge resolves it
-        # in practice; anything past that falls through to the generic
-        # handler below rather than retrying forever.
+        # Groq rejects tool calls with null arguments, which the model tends
+        # to produce for vague queries. Retry once with an instruction to
+        # omit missing arguments.
         if "tool_use_failed" not in str(e):
             raise
         logger.warning("Retrying chat request after a tool_use_failed response from Groq")
@@ -282,11 +258,8 @@ async def chat_endpoint(request: ChatRequest, agent_executor=Depends(get_app_age
                 detail=f"Internal error. Reference ID: {correlation_id}",
             )
     except Exception:
-        # Never return raw exception text to the client (fix-list 2.4) --
-        # it can leak internals (stack frames, connection strings, prompt
-        # content). Log the real error server-side keyed by a correlation
-        # ID and hand the client only that ID to reference when reporting
-        # the issue.
+        # Log the error with a correlation ID and return only the ID, so
+        # internal details never reach the client.
         correlation_id = uuid.uuid4().hex[:12]
         logger.exception("Agent execution failed [correlation_id=%s]", correlation_id)
         raise HTTPException(
@@ -301,9 +274,7 @@ async def ingest_properties(
     session_factory=Depends(get_app_session_factory),
     settings: Settings = Depends(get_app_settings),
 ):
-    # Ingestion itself doesn't happen here anymore -- this just lands the
-    # file where the Airflow poller DAG will find it and records a job row.
-    # See dags/watch_ingest_landing_dag.py and dags/ingest_properties_dag.py.
+    # Save the file for the Airflow DAG to pick up and record a job row.
     _check_spreadsheet_content_type(file)
     file_contents = await _read_upload_or_413(file, settings)
     try:
@@ -364,8 +335,7 @@ async def parse_floorplan_debug(
     _check_image_content_type(file)
     contents = await _read_upload_or_413(file, settings)
 
-    # Never trust the client-supplied filename as a path (path traversal) —
-    # write to a generated temp path instead, and always clean it up.
+    # Write to a generated temp path rather than the client's filename.
     fd, file_path = tempfile.mkstemp(dir="/tmp")
     try:
         with os.fdopen(fd, "wb") as f:

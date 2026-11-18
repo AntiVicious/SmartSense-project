@@ -1,22 +1,12 @@
-# Deliberately a separate, lean image from src/Dockerfile.api -- the
-# Streamlit UI only ever talks to the api service over HTTP (see main.py's
-# API_BASE_URL), so it has no reason to carry torch/ultralytics/easyocr/
-# langchain or the model weights. Splitting this out (fix-list 2.1) is also
-# what makes "the container is up" actually mean "the process users hit is
-# up" -- previously run.sh backgrounded uvicorn and foregrounded Streamlit
-# in one container, so a dead backend didn't make the container unhealthy.
+# The UI only calls the API over HTTP, so this image needs only Streamlit
+# and requests.
 FROM python:3.10-slim
 WORKDIR /app
 
-# Held to the exact versions in constraints-ui.txt -- requirements-ui.txt
-# is unpinned.
 COPY constraints-ui.txt requirements-ui.txt ./
 RUN PIP_CONSTRAINT=constraints-ui.txt pip install --no-cache-dir -r requirements-ui.txt
 
 COPY src/main.py ./src/main.py
 
-# Shell form (not exec-form JSON array) so $PORT actually expands --
-# Cloud Run injects PORT (default 8080) and requires the container listen
-# on whatever value it sets, not a hardcoded port. Defaults to 8501 to
-# match docker-compose.yml's local port mapping, where PORT is unset.
+# Shell form so $PORT expands; Cloud Run sets PORT, local runs default to 8501.
 CMD python -m streamlit run src/main.py --server.port ${PORT:-8501} --server.address 0.0.0.0

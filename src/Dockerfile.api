@@ -1,69 +1,42 @@
 FROM python:3.10-slim
 WORKDIR /app
 
-# --- 1. Install System Dependencies ---
+# System libraries needed by OpenCV
 RUN apt-get update && apt-get install -y \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# --- 2. Install HEAVY Python Dependencies ---
-# Every pip install below is held to the exact versions in
-# constraints-api.txt -- requirements*.txt are mostly unpinned.
+# Heavy dependencies (PyTorch, Ultralytics, EasyOCR) in their own layer so
+# code changes don't reinstall them. Versions are pinned by constraints-api.txt.
 COPY constraints-api.txt .
 ENV PIP_CONSTRAINT=/app/constraints-api.txt
 COPY requirements-heavy.txt .
 RUN pip install --no-cache-dir -r requirements-heavy.txt
 
-# --- 3. Install LIGHT Python Dependencies ---
+# Light dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# --- 3b. Pre-download EasyOCR and SentenceTransformer model weights ---
-# Without this, both download from the internet the first time they're
-# used -- EasyOCR's own status message warns this "may take several
-# minutes" -- which happens on every cold start on a platform with no
-# persistent local disk (Cloud Run), and was enough to blow past Cloud
-# Run's startup probe timeout outright. Baked in at build time instead,
-# same reasoning as best_1000.pt below.
+# Download the EasyOCR and embedding models at build time, so containers
+# without persistent disk (e.g. Cloud Run) don't download them on every
+# cold start.
 RUN python -c "import easyocr; easyocr.Reader(['en'])"
 RUN python -c "from langchain_community.embeddings import HuggingFaceEmbeddings; HuggingFaceEmbeddings(model_name='all-MiniLM-L6-v2')"
 
-# Runtime-only (set *after* the download step above, which needs network
-# access) -- without this, HuggingFaceEmbeddings still calls out to the HF
-# Hub on every startup to check for updates even though the model is
-# already cached, and that call hanging/slow on Cloud Run's network is
-# exactly what blew past the startup probe timeout. This forces it to use
-# the cache unconditionally, no network involved.
+# Use the cached models at runtime without contacting the Hugging Face Hub.
 ENV HF_HUB_OFFLINE=1
 ENV TRANSFORMERS_OFFLINE=1
 
-# --- 4. Copy the App Code ---
-# Preserved as a package (src/api.py, src/config.py, ...) rather than
-# flattened into /app — api.py uses relative imports (from .config import
-# ...), which only resolve if src stays a real package both here and in
-# local dev, where `python -c "import src.api"` is run from the repo root.
-# .dockerignore excludes src/*.pt, so this never bakes in a stale local
-# copy of the weights — the fetch step below is the only source.
+# Keep src as a package, since api.py uses relative imports.
 COPY src/ ./src/
 
-# --- 4b. Fetch model weights ---
-# best_1000.pt isn't committed to git (see README) — it's published as a
-# GitHub release asset instead. Pinned to an exact tag + checksum so a
-# build never silently picks up a different file.
+# Model weights are published as a GitHub release asset and verified by checksum.
 ARG MODEL_WEIGHTS_URL=https://github.com/AntiVicious/SmartSense-project/releases/download/model-weights-v1/best_1000.pt
 ARG MODEL_WEIGHTS_SHA256=742fd385ac46ba7dea4c8a36c38c8014fe3b7f3c5bf9a8de9efb2947daea9545
 RUN python -c "import urllib.request; urllib.request.urlretrieve('${MODEL_WEIGHTS_URL}', '/app/src/best_1000.pt')" \
     && echo "${MODEL_WEIGHTS_SHA256}  /app/src/best_1000.pt" | sha256sum -c -
 
-# --- 5. Copy the Data ---
 COPY data /app/data
 
-# --- 6. Run the API ---
-# One process per container (fix-list 2.1) -- this image no longer runs
-# Streamlit at all (see src/Dockerfile.ui), so there's nothing for a dead
-# uvicorn to hide behind: if this process dies, the container dies.
-# Shell form (not exec-form JSON array) so $PORT actually expands --
-# Cloud Run injects PORT (default 8080) and requires the container listen
-# on whatever value it sets, not a hardcoded port. Defaults to 8000 to
-# match docker-compose.yml's local port mapping, where PORT is unset.
+# Shell form so $PORT expands; Cloud Run sets PORT, local runs default to 8000.
 CMD python -m uvicorn src.api:app --host 0.0.0.0 --port ${PORT:-8000}

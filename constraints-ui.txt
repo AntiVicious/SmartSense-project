@@ -1,8 +1,6 @@
-# Exact versions from the last image that ran in production (pip freeze of
-# ghcr.io/antivicious/smartsense-ui), applied via PIP_CONSTRAINT in
-# src/Dockerfile.ui so a rebuild -- including on ARM64 -- gets the same
-# stack instead of whatever is newest. nvidia-*/triton are left out:
-# they're x86 CUDA extras torch pulls in by itself where they apply.
+# Exact versions from the deployed smartsense-ui image, applied through
+# PIP_CONSTRAINT in src/Dockerfile.ui. nvidia-* and triton are omitted;
+# torch installs them where needed.
 altair==6.2.2
 anyio==4.14.2
 attrs==26.1.0

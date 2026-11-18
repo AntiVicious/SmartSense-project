@@ -1,19 +1,11 @@
 #!/usr/bin/env python
-"""Backfill: land a directory of historical spreadsheets for the Airflow
-poller DAG to pick up, the same way POST /ingest does.
+"""Lands a directory of spreadsheets for ingestion, the same way POST /ingest
+does.
 
-There's no separate "backfill mode" in the DAG itself -- this script just
-calls the exact same src.ingest_landing.land_ingest_file() the API uses,
-once per file, so every backfilled file gets a real ingest_jobs row and
-goes through dags/watch_ingest_landing_dag.py -> dags/ingest_properties_dag.py
-like any other upload. Re-running this script (or dropping the same file
-again by any other means) is safe: external_id is derived from row
-content, not upload time, so ingestion is idempotent regardless of how
-many times a given spreadsheet gets backfilled.
+Each file gets an ingest_jobs row and goes through the normal Airflow DAGs.
+Re-running is safe, because rows are keyed by content-derived IDs.
 
-Run from the api service's environment (needs src.db/src.models, which
-pull in the same dependencies the API does) -- not from Airflow's lean
-image:
+Run it in the api container, which has the required dependencies:
 
     docker compose run --rm api python scripts/backfill_ingest.py data/backfill/
 

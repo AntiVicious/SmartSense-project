@@ -10,11 +10,8 @@ from .db import Base
 class Property(Base):
     __tablename__ = "properties"
     id = Column(Integer, primary_key=True, index=True)
-    # Stable identity for upserts: either a business key from the source
-    # spreadsheet or a deterministic hash of (title, location, image_file)
-    # -- see src/ingest_support.py:compute_external_id. Never the
-    # autoincrement id, and never derived from upload time, so re-running
-    # the same input (including via backfill) is idempotent by construction.
+    # Stable key for upserts: the spreadsheet's listing_id, or a hash of
+    # title, location and image file (ingest_support.compute_external_id).
     external_id = Column(String, unique=True, index=True, nullable=False)
     title = Column(String, index=True)
     description = Column(Text)
@@ -31,10 +28,10 @@ class Property(Base):
 
 
 class IngestJob(Base):
-    """Tracks one /ingest upload end to end. Written by the Airflow DAGs
-    (poller sets 'running', the pipeline DAG's success/failure callbacks
-    set the terminal state) and read by GET /ingest/{job_id} -- the API
-    never queries Airflow directly for status, only this table."""
+    """Status of one /ingest upload.
+
+    The Airflow DAGs update it (the poller sets 'running'; the pipeline's
+    callbacks set the final state) and GET /ingest/{job_id} reads it."""
 
     __tablename__ = "ingest_jobs"
     job_id = Column(String, primary_key=True)
@@ -55,9 +52,8 @@ class ChatRequest(BaseModel):
 
 
 class InternalParseFloorplanRequest(BaseModel):
-    """Body for POST /internal/parse-floorplan. image_path is a path on the
-    shared data volume (Airflow and the app both mount it) -- the Airflow
-    task never uploads image bytes over HTTP, just points at the file."""
+    """Body for POST /internal/parse-floorplan. image_path is on the data
+    volume shared by Airflow and the API."""
 
     image_path: str
 

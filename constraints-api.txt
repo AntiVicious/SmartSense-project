@@ -1,8 +1,6 @@
-# Exact versions from the last image that ran in production (pip freeze of
-# ghcr.io/antivicious/smartsense-api), applied via PIP_CONSTRAINT in
-# src/Dockerfile.api so a rebuild -- including on ARM64 -- gets the same
-# stack instead of whatever is newest. nvidia-*/triton are left out:
-# they're x86 CUDA extras torch pulls in by itself where they apply.
+# Exact versions from the deployed smartsense-api image, applied through
+# PIP_CONSTRAINT in src/Dockerfile.api. nvidia-* and triton are omitted;
+# torch installs them where needed.
 aiohappyeyeballs==2.7.1
 aiohttp==3.14.3
 aiosignal==1.4.0

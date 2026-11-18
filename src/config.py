@@ -1,15 +1,9 @@
 """Application configuration.
 
-All environment variables are read here, once, through pydantic-settings.
-Required variables (the Postgres credentials, the Groq key) have no default,
-so instantiating Settings() fails loudly and immediately if one is missing —
-instead of silently building a connection string like
-"postgresql://None:None@postgres-db/None" that only breaks later, confusingly,
-when something tries to actually connect.
-
-Nothing in this module reads the environment at import time: get_settings()
-is only ever called from the app's lifespan and from request-time FastAPI
-dependencies, never at module scope.
+All environment variables are read here through pydantic-settings.
+Required variables have no default, so Settings() fails at startup if one is
+missing. get_settings() is called from the app's lifespan and request
+dependencies, never at import time.
 """
 
 from functools import lru_cache
@@ -25,16 +19,13 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str
     POSTGRES_HOST: str = "postgres-db"  # Docker Compose service name
-    # Free-tier managed Postgres (Neon, Supabase, ...) rejects unencrypted
-    # connections -- local Docker Postgres has no TLS cert to offer, so the
-    # default has to stay "disable" or local dev breaks. Override to
-    # "require" for those.
+    # "disable" for local Docker Postgres; set to "require" for managed
+    # services such as Neon.
     POSTGRES_SSLMODE: str = "disable"
 
     # --- Qdrant ---
-    # QDRANT_HOST is either a bare hostname (self-hosted, e.g. the Docker
-    # Compose service name) or a full URL including scheme (Qdrant Cloud,
-    # e.g. https://xyz.cloud.qdrant.io) -- see db.py's get_qdrant_client().
+    # A hostname (self-hosted) or a full URL (Qdrant Cloud); see
+    # db.get_qdrant_client().
     QDRANT_HOST: str = "qdrant-db"
     QDRANT_API_KEY: str | None = None  # required for Qdrant Cloud, unused self-hosted
     QDRANT_VECTOR_COLLECTION: str = "properties"
@@ -46,27 +37,20 @@ class Settings(BaseSettings):
     # --- Embeddings ---
     EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
 
-    # --- Internal API (Airflow -> app calls for floorplan parsing / embedding) ---
-    # Required, no default: these endpoints run real inference on request,
-    # so an unset key should fail startup loudly rather than leave them
-    # reachable with a guessable default.
+    # --- Internal API key for Airflow's calls to /internal/* ---
     INTERNAL_API_KEY: str
 
-    # --- Ingest landing directory (file-drop trigger for the Airflow DAGs) ---
+    # --- Directory watched by the Airflow ingestion DAG ---
     INGEST_LANDING_DIR: str = "/app/data/_incoming"
 
-    # --- Logging (fix-list 2.3) ---
+    # --- Logging ---
     LOG_LEVEL: str = "INFO"
 
-    # --- API key for public write/debug endpoints: POST /ingest and
-    # POST /parse-floorplan-debug (fix-list 2.6). Distinct from
-    # INTERNAL_API_KEY -- that one is Airflow-only; this one is held by the
-    # ui service (see src/main.py) and, if you're calling these endpoints
-    # directly, whoever else you hand it to. Required, no default, same
-    # fail-loudly reasoning as INTERNAL_API_KEY.
+    # --- API key for POST /ingest and POST /parse-floorplan-debug, sent by
+    # the ui service ---
     API_KEY: str
 
-    # --- Upload validation (fix-list 2.5) ---
+    # --- Upload validation ---
     MAX_UPLOAD_SIZE_MB: int = 15
 
     @property
@@ -75,12 +59,9 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        # Cloud SQL's Auth Proxy (or Cloud Run's built-in Cloud SQL
-        # connection) exposes the database over a Unix socket at
-        # /cloudsql/<INSTANCE_CONNECTION_NAME> instead of a host:port --
-        # detected here by POSTGRES_HOST starting with "/", since that's
-        # never a valid hostname. psycopg2's URL form for a socket
-        # directory takes the host as a query param, not before the "/".
+        # A host starting with "/" is a Unix socket directory (e.g. Cloud
+        # SQL's /cloudsql/<instance>), which psycopg2 takes as a query
+        # parameter.
         if self.POSTGRES_HOST.startswith("/"):
             return (
                 f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"

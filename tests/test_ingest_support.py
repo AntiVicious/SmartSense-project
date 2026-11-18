@@ -1,7 +1,6 @@
 """
-Tests for src/ingest_support.py -- pure stdlib functions shared between
-the app and the Airflow DAGs. No fakes needed; nothing here touches a
-model, a database, or the network.
+Tests for src/ingest_support.py, the ID helpers shared by the API and the
+Airflow DAGs.
 """
 
 import os
@@ -21,10 +20,8 @@ def test_external_id_is_deterministic():
 
 
 def test_external_id_matches_known_value():
-    # Pinned against the exact value migrations/versions/0001_...  backfills
-    # for the same inputs -- if this ever drifts from the migration's
-    # (deliberately duplicated) copy of the algorithm, old rows and newly
-    # ingested rows would stop matching.
+    # Must match the value migration 0001 computes for the same inputs, or
+    # existing and newly ingested rows would get different IDs.
     assert (
         compute_external_id("Old Cottage", "Springfield", "house1.jpg") == "a7a1bb912903124c132a61b9e231eca6"
     )
@@ -39,8 +36,7 @@ def test_external_id_differs_for_different_inputs():
 
 
 def test_external_id_handles_none_fields():
-    # A row missing location or image_file shouldn't raise -- it should
-    # just fold into the hash as an empty segment, same as any other row.
+    # Missing fields are hashed as empty strings.
     result = compute_external_id("Title Only", None, None)
     assert isinstance(result, str) and len(result) == 32
 
@@ -74,17 +70,14 @@ def test_qdrant_point_id_differs_for_different_external_ids():
 
 
 def test_qdrant_point_id_never_derived_from_a_sql_autoincrement_id():
-    # Regression guard for the fix-list bug: point IDs must come from
-    # content identity, not from a Postgres id that a volume reset could
-    # hand out to a completely different row. "1" and "2" are what an
-    # autoincrement id would look like -- qdrant_point_id must never
-    # produce these for arbitrary external_ids.
+    # Point IDs must be derived from external_id, never look like a
+    # Postgres autoincrement id.
     for eid in ("1", "2", "123"):
         point_id = qdrant_point_id(eid)
         assert point_id not in ("1", "2", "123")
         import uuid
 
-        uuid.UUID(point_id)  # still a real UUID, not a passthrough of the input
+        uuid.UUID(point_id)  # a UUID, not the input passed through
 
 
 CASES = [

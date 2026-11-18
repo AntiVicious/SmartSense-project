@@ -1,16 +1,10 @@
 """Shared helpers for the Airflow DAGs.
 
-Everything here reads Airflow Connections (BaseHook.get_connection), never
-raw os.environ -- Connections are seeded via AIRFLOW_CONN_* env vars on the
-Airflow containers (see docker-compose.yml), which is the framework's own
-sanctioned way to provide them in a 12-factor deployment; that's a
-different thing from a DAG reading os.getenv() directly, which is what
-we're avoiding.
+Configuration comes from Airflow Connections (BaseHook.get_connection),
+which docker-compose.yml seeds through AIRFLOW_CONN_* variables.
 
-Deliberately independent of src/db.py and src/config.py: those import
-langchain_community (and transitively torch via sentence-transformers),
-which Airflow's image does not carry. This module only needs sqlalchemy
-and qdrant-client, both in requirements-airflow.txt.
+This module doesn't use src/db.py or src/config.py, because they depend on
+packages the Airflow image doesn't include.
 """
 
 import os
@@ -28,7 +22,7 @@ POSTGRES_CONN_ID = "smartsense_postgres"
 QDRANT_CONN_ID = "smartsense_qdrant"
 INTERNAL_API_CONN_ID = "smartsense_internal_api"
 
-# Shared with the app's own data volume -- both containers mount ./data.
+# Both the API and Airflow mount ./data.
 INGEST_LANDING_DIR = "/app/data/_incoming"
 STAGING_ROOT = "/app/data/_staging"
 IMAGES_DIR = "/app/data/images"
@@ -38,10 +32,8 @@ QDRANT_COLLECTION = "properties"
 
 def get_postgres_engine():
     conn = BaseHook.get_connection(POSTGRES_CONN_ID)
-    # Built from discrete fields rather than conn.get_uri() -- Airflow's
-    # URI reconstruction is provider/conn_type-dependent (e.g. some
-    # produce "postgres://", which SQLAlchemy 1.4+/2.0 rejects outright;
-    # it wants "postgresql://"), so this is more predictable.
+    # Built from individual fields because conn.get_uri() can produce a
+    # "postgres://" scheme, which SQLAlchemy rejects.
     url = f"postgresql://{conn.login}:{conn.password}@{conn.host}:{conn.port}/{conn.schema}"
     sslmode = conn.extra_dejson.get("sslmode")
     if sslmode:
@@ -59,11 +51,9 @@ def get_qdrant_client():
     conn = BaseHook.get_connection(QDRANT_CONN_ID)
     api_key = conn.extra_dejson.get("api_key")
     if conn.conn_type in ("http", "https"):
-        # Qdrant Cloud (or any URL-addressed instance) -- the connection's
-        # scheme was parsed out of the URI into conn_type, e.g.
-        # "https://xyz.cloud.qdrant.io" gives conn_type="https", host="xyz...".
-        # No port appended: Qdrant Cloud serves HTTPS on the standard port,
-        # not 6333 -- matches src/db.py's get_qdrant_client() for the app.
+        # URL-addressed instance such as Qdrant Cloud: Airflow parses the
+        # scheme into conn_type. No port is added, since Qdrant Cloud uses
+        # the standard HTTPS port.
         return QdrantClient(url=f"{conn.conn_type}://{conn.host}", api_key=api_key)
     return QdrantClient(host=conn.host, port=conn.port or 6333, api_key=api_key)
 

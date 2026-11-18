@@ -1,10 +1,8 @@
 """PDF text extraction: local certificate files and remote URLs.
 
-Currently unreferenced: dags/ingest_properties_dag.py's
-extract_certificate_text task does its own inline PyMuPDF extraction
-rather than calling either function here (a leftover from before the
-Airflow migration). Flagging rather than deleting -- out of scope for
-the change that found it."""
+Not currently used by the ingestion DAG, which extracts certificate text
+in its own task.
+"""
 
 import logging
 import os

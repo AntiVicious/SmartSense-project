@@ -1,16 +1,11 @@
-"""Watches INGEST_LANDING_DIR for files POST /ingest lands there and
-triggers dags/ingest_properties_dag.py once per file.
+"""Watches INGEST_LANDING_DIR and triggers dags/ingest_properties_dag.py
+once per landed file.
 
-Runs on a short fixed schedule rather than a blocking sensor -- avoids
-needing Airflow's deferrable-operator/triggerer component for what's
-fundamentally "check a directory," at this project's scale. Claims a
-file (atomic rename into a _claimed/ subdirectory) before triggering, so
-a file is never picked up twice even if two poller runs briefly overlap.
+Runs every minute instead of using a sensor, which would need Airflow's
+triggerer. Each file is claimed by an atomic rename into _claimed/ before
+triggering, so overlapping runs never process a file twice.
 
-This is also the backfill path: dropping historical spreadsheets into
-INGEST_LANDING_DIR (via scripts/backfill_ingest.py, which creates the
-matching ingest_jobs row the same way POST /ingest does) is picked up by
-this same DAG. There's no separate backfill trigger.
+Files landed by scripts/backfill_ingest.py are processed the same way.
 """
 
 import os
@@ -52,7 +47,7 @@ def watch_ingest_landing():
         for name in sorted(os.listdir(INGEST_LANDING_DIR)):
             full_path = os.path.join(INGEST_LANDING_DIR, name)
             if not os.path.isfile(full_path):
-                continue  # skips _claimed/ itself
+                continue  # skip the _claimed/ directory
             job_id, _ext = os.path.splitext(name)
             entries.append({"filename": name, "job_id": job_id, "path": full_path})
         return entries
@@ -69,18 +64,15 @@ def watch_ingest_landing():
                 sa.text("SELECT 1 FROM ingest_jobs WHERE job_id = :job_id"), {"job_id": job_id}
             ).first()
         if not exists:
-            # A file with no matching job row didn't come through
-            # POST /ingest or the backfill script -- leave it alone
-            # rather than guess at what to do with it.
+            # No job row: not landed by POST /ingest or the backfill
+            # script, so skip it.
             print(f"No ingest_jobs row for job_id={job_id!r}; leaving {file_info['path']} untouched")
             return
 
         ensure_shared_dir(CLAIMED_DIR)
         claimed_path = os.path.join(CLAIMED_DIR, file_info["filename"])
         try:
-            # Atomic on the same filesystem: after this, the file either
-            # wasn't here anymore (another poller run claimed it first)
-            # or it's now exclusively ours.
+            # Atomic rename: fails if another run already claimed the file.
             os.rename(file_info["path"], claimed_path)
         except FileNotFoundError:
             print(f"{file_info['path']} already claimed by another run; skipping")

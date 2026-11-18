@@ -1,16 +1,12 @@
 """Add properties.external_id and the ingest_jobs table
 
-This is the migration for an instance that predates the Airflow ingest
-pipeline -- a fresh install can rely on Base.metadata.create_all() in
-api.py's lifespan instead (it builds the current schema, external_id
-included, from nothing). This migration exists for anyone upgrading an
-already-running instance with existing properties rows.
+Upgrades databases created before the Airflow pipeline. Fresh installs get
+the current schema from Base.metadata.create_all() in api.py's lifespan.
 
-external_id is added nullable first, backfilled using the exact same
+external_id is added as nullable, filled using the same
 sha256(title|location|floorplan_image_url) scheme as
-src.ingest_support.compute_external_id (duplicated here deliberately --
-migrations should not import application code that might change shape
-out from under an old migration), then tightened to NOT NULL + UNIQUE.
+src.ingest_support.compute_external_id (copied, since migrations shouldn't
+import application code), then made NOT NULL and UNIQUE.
 
 Revision ID: 0001
 Revises:
@@ -39,9 +35,7 @@ def upgrade() -> None:
 
     op.add_column("properties", sa.Column("external_id", sa.String(), nullable=True))
 
-    # Backfill any pre-existing rows so the NOT NULL constraint below can
-    # be applied. A fresh install has no rows at this point -- this only
-    # does real work when upgrading a live instance.
+    # Fill external_id for existing rows before adding NOT NULL.
     rows = bind.execute(
         sa.text("SELECT id, title, location, floorplan_image_url FROM properties WHERE external_id IS NULL")
     ).fetchall()

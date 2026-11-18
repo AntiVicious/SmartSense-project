@@ -1,29 +1,17 @@
 #!/usr/bin/env python
-"""Benchmarks best_1000.pt against best_300.pt (the training run's two
-checkpoints) on room_name detection count -- the evidence behind deleting
-best_300.pt (see README's Floorplan CV Model section).
+"""Compares the two training checkpoints, best_1000.pt and best_300.pt, on
+room_name detection count.
 
-best_300.pt is not in this repo (deleted in commit aea4a40) and is not
-re-added by this script. Recover it from git history first:
+best_300.pt was removed from the repo; restore it from history first:
 
     git show aea4a40^:src/best_300.pt > src/best_300.pt
 
-Ground truth (GROUND_TRUTH below) is a hand count of room_name-style text
-labels -- including fixture/appliance labels like "Ref." or "W"/"D" next
-to Laundry, which is how this dataset's own annotations treat them
-(consistent with what shows up as real room_name detections elsewhere in
-this project, e.g. eval/REPORT.md) -- on 16 of the 73 images in
-data/images/, done once by visual inspection since no ground truth ships
-with this repo. Spot-checked against the actual images before trusting
-it for this script: 10_29_...0c50679... reads exactly 6 labels (M.BR.,
-FAMILY, DIN, BR.2, GARAGE, BR.3); 0_30_...bcf0ea4... reads exactly 18
-once fixture labels (Ref., Micro./Coffee) are counted alongside the 16
-room labels -- both match the recorded values below.
+GROUND_TRUTH holds hand counts of room_name labels on 16 of the 73 images,
+including fixture labels such as "Ref." or "W"/"D", which the dataset's
+annotations also mark as room_name.
 
-"Error" here is |predicted room_name count - hand-counted true count|
-per image, averaged over these 16 images -- a detection-count metric,
-independent of the OCR/classify_room_label pipeline entirely (that's
-eval/REPORT.md's job; this script never runs OCR).
+Error is |predicted count - true count| per image, averaged over the 16
+images. OCR is not involved; see eval/REPORT.md for the OCR evaluation.
 
 Usage:
     python scripts/benchmark_yolo_checkpoints.py \
@@ -39,9 +27,7 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-# Hand-counted true room_name-label count per image, done once by visual
-# inspection of the 16 images below (see module docstring for the
-# spot-check that validated this before it was trusted).
+# Hand-counted room_name labels per image.
 GROUND_TRUTH = {
     "0_20_jpg.rf.55d03cd6dd66cf512099eb67e527175c.jpg": 14,
     "0_26_jpg.rf.22d020e2780fff58cefb479d8fd41058.jpg": 12,
